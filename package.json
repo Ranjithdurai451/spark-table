@@ -19,7 +19,6 @@
     "clsx": "^2.1.1",
     "init": "^0.1.2",
     "lucide-react": "^0.545.0",
-    "papaparse": "^5.5.3",
     "react": "^19.1.1",
     "react-dom": "^19.1.1",
     "shadcn": "^3.4.0",

@@ -1,44 +1,56 @@
+"use client"
 
-import * as React from "react"
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { Button } from "@/components/ui/button"
 import * as XLSX from "xlsx"
 import { usePivotStore } from "@/lib/store/pivot-store"
-import Papa from "papaparse"
-export const UploadDialog=({
+import { useRef, useState } from "react"
+
+export const UploadDialog = ({
   open,
   onOpenChange,
 }: {
   open: boolean
   onOpenChange: (open: boolean) => void
-})=> {
-  const { setData } = usePivotStore()
-  const [busy, setBusy] = React.useState(false)
-  const inputRef = React.useRef<HTMLInputElement>(null)
-  const [error, setError] = React.useState<string | null>(null)
+}) => {
+  const { setData, clearData } = usePivotStore()
+  const [busy, setBusy] = useState(false)
+  const inputRef = useRef<HTMLInputElement>(null)
+  const [error, setError] = useState<string | null>(null)
 
   async function handleFiles(file: File) {
     setBusy(true)
     setError(null)
+    
     try {
-      const ext = file.name.split(".").pop()?.toLowerCase()
-      if (ext === "csv") {
-        const text = await file.text()
-        const res = Papa.parse(text, { header: true, dynamicTyping: true, skipEmptyLines: true })
-        const rows = (res.data as any[]).filter(Boolean)
-        setData(rows, file.name) // include file name
-      } else if (ext === "xlsx" || ext === "xls") {
-        const buf = await file.arrayBuffer()
-        const wb = XLSX.read(buf)
-        const firstSheet = wb.SheetNames[0]
-        const ws = wb.Sheets[firstSheet]
-        const rows: any[] = XLSX.utils.sheet_to_json(ws, { defval: null })
-        setData(rows, file.name) // include file name
-      } else {
-        throw new Error("Unsupported file type. Please upload a CSV or Excel file.")
+      // Clear existing data first to force re-render
+      clearData()
+      
+      const arrayBuffer = await file.arrayBuffer()
+      const workbook = XLSX.read(arrayBuffer, { 
+        type: "array",
+        codepage: 65001
+      })
+      
+      const firstSheetName = workbook.SheetNames[0]
+      const worksheet = workbook.Sheets[firstSheetName]
+      
+      const rows: any[] = XLSX.utils.sheet_to_json(worksheet, { 
+        defval: null,
+        raw: false
+      })
+      
+      console.log("Parsed rows:", rows)
+      setData(rows, file.name)
+      
+      // Reset the file input to allow re-uploading same file
+      if (inputRef.current) {
+        inputRef.current.value = ""
       }
+      
       onOpenChange(false)
     } catch (e: any) {
+      console.error("Upload error:", e)
       setError(e.message ?? "Failed to parse file")
     } finally {
       setBusy(false)
@@ -54,7 +66,7 @@ export const UploadDialog=({
         </DialogHeader>
 
         <div
-          className="rounded-md border border-dashed p-6 text-center cursor-pointer hover:bg-accent"
+          className="rounded-md border border-dashed p-6 text-center cursor-pointer hover:bg-accent transition-colors"
           onClick={() => inputRef.current?.click()}
           onDragOver={(e) => e.preventDefault()}
           onDrop={(e) => {
@@ -66,7 +78,7 @@ export const UploadDialog=({
           aria-label="Upload area"
         >
           <p className="text-sm">Drop file here or click to browse</p>
-          <p className="text-xs text-muted-foreground pt-1">CSV, XLSX supported</p>
+          <p className="text-xs text-muted-foreground pt-1">CSV, XLSX, XLS supported</p>
         </div>
 
         <input
@@ -84,13 +96,11 @@ export const UploadDialog=({
           <Button variant="secondary" onClick={() => onOpenChange(false)} disabled={busy}>
             Cancel
           </Button>
-          <Button disabled>{busy ? "Uploading..." : "Upload"}</Button>
         </div>
 
-        {error && <p className="text-destructive text-sm">{error}</p>}
+        {error && <p className="text-destructive text-sm mt-2">{error}</p>}
+        {busy && <p className="text-sm text-muted-foreground mt-2">Processing file...</p>}
       </DialogContent>
     </Dialog>
   )
 }
-
-
