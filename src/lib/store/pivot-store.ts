@@ -16,7 +16,7 @@ type State = {
   setShowRaw: (v: boolean) => void
 }
 
-export const usePivotStore = create<State>((set, get) => ({
+export const usePivotStore = create<State>((set) => ({
   data: [],
   fields: [],
   numericFields: [],

@@ -7,7 +7,7 @@ export const DefaultTable = () => {
   const columns = fields.map((f) => ({
     accessorKey: f,
     header: f,
-    cell: (ctx) => String(ctx.getValue() ?? ""),
+    cell: (ctx:any) => String(ctx.getValue() ?? ""),
   }))
 
   const table = useReactTable({
