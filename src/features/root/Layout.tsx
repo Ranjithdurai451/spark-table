@@ -1,16 +1,19 @@
 
 import { Button } from "@/components/ui/button"
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
-import { FileSpreadsheet, ChevronDown, RotateCcw, Upload, Sidebar } from "lucide-react"
+import { FileSpreadsheet, ChevronDown, RotateCcw, Upload } from "lucide-react"
 import { UploadDialog } from "../upload/UploadDialog"
 import { usePivotStore } from "@/lib/store/pivot-store"
-import { useState } from "react"
-import { DefaultTable } from "../table-view/DefaltTable"
+import { useEffect, useState } from "react"
+import { DefaultTable } from "../table-view/DefaultTable"
 import { SidebarControls } from "../sidebar/SidebarControls"
 
 export default function Layout() {
   const [openUpload, setOpenUpload] = useState(false)
-  const { data, fileName, clearData, showRaw } = usePivotStore()
+  const { data, fileName, clearData, showRaw,rowsGroups,columnsGroups } = usePivotStore()
+  useEffect(() => {
+    console.log("rowsGroups or columnsGroups changed:", { rowsGroups, columnsGroups });
+  }, [rowsGroups,columnsGroups])
 
 
   return (

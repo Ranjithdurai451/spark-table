@@ -54,7 +54,8 @@ export const SidebarControls = ({ fields, className }: { fields: string[]; class
 
         // Get source zone
         const sourceZone = getZoneOfField(draggedField)
-
+        console.log("numbericFields",numericFields)
+       console.log(dropZone,draggedField)
         // Validate numeric fields for values zone
         if (dropZone === "values" && !numericFields.includes(draggedField)) {
             return
@@ -113,7 +114,7 @@ export const SidebarControls = ({ fields, className }: { fields: string[]; class
 
 function PanelShell({ title, children, onClose, width, showRightBorder }: { title: string; children: React.ReactNode; onClose: () => void; width: number; showRightBorder?: boolean }) {
     return (
-        <div className={cn("h-full bg-background flex flex-col", showRightBorder && "border-r")} style={{ width }}>
+        <div className={cn("h-full bg-background flex flex-col overflow-hidden-imp", showRightBorder && "border-r")} style={{ width }}>
             <header className="h-10 border-b flex items-center justify-between px-3 flex-shrink-0">
                 <span className="text-sm font-medium">{title}</span>
                 <Button size="icon" variant="ghost" className="h-6 w-6" onClick={onClose} aria-label={`Close ${title}`}>
@@ -128,9 +129,9 @@ function PanelShell({ title, children, onClose, width, showRightBorder }: { titl
 function RailTab({ active, icon, label, onClick }: { active?: boolean; icon: React.ReactNode; label: string; onClick: () => void }) {
     return (
         <button className={cn("flex h-32 w-9 items-center justify-center rounded border transition-colors", active ? "bg-muted border-input" : "bg-background border-border hover:bg-muted/50")} onClick={onClick} aria-label={label} aria-pressed={active}>
-            <div className="flex flex-col items-center gap-1.5">
+            <div className="flex flex-col items-center gap-5">
                 <div className={cn("transition-colors", active ? "text-foreground" : "text-muted-foreground")}>{icon}</div>
-                <span className={cn("text-[9px] whitespace-nowrap transition-colors", active ? "text-foreground" : "text-muted-foreground")} style={{ writingMode: "vertical-rl", transform: "rotate(180deg)" }} aria-hidden>
+                <span className={cn("text-sm whitespace-nowrap transition-colors", active ? "text-foreground" : "text-muted-foreground")} style={{ writingMode: "vertical-rl", transform: "rotate(180deg)" }} aria-hidden>
                     {label}
                 </span>
             </div>
@@ -181,40 +182,43 @@ function DataPanel({ fields }: { fields: string[] }) {
 
 // Draggable field in data panel
 function DataFieldItem({ field, isActive, isNumeric, onToggle }: { field: string; isActive: boolean; isNumeric: boolean; onToggle: () => void }) {
-    const { getZoneOfField } = usePivotStore()
-    const { attributes, listeners, setNodeRef, transform, isDragging } = useDraggable({
-        id: field,
-        data: { from: getZoneOfField(field) ?? "data" },
-    })
+  const { getZoneOfField } = usePivotStore();
+  const { attributes, listeners, setNodeRef, transform, isDragging } = useDraggable({
+    id: field,
+    data: { from: getZoneOfField(field) ?? "data" },
+    disabled: isActive, // Disable dragging if checked
+  });
 
-    const style = {
-        transform: CSS.Translate.toString(transform),
-    }
+  const style = {
+    transform: CSS.Translate.toString(transform),
+    opacity: isDragging ? 0 : 1,
+  };
 
-    return (
-        <div
-            ref={setNodeRef}
-            style={style}
-            className={cn(
-                "flex items-center gap-2 rounded border bg-background px-2 py-1.5 text-xs transition-colors",
-                "hover:bg-muted/50",
-                isActive && "border-input bg-muted",
-                isDragging && "opacity-50"
-            )}
-        >
-            {/* Drag Handle - Only this area triggers drag */}
-            <div {...listeners} {...attributes} className="cursor-grab active:cursor-grabbing touch-none">
-                <GripVertical className="h-3 w-3 text-muted-foreground flex-shrink-0" />
-            </div>
+  return (
+    <div
+      ref={setNodeRef}
+      style={style}
+      className={cn(
+        "flex items-center gap-2 rounded border bg-background px-2 py-1.5 text-xs transition-colors",
+        "hover:bg-muted/50",
+        isActive && "border-input bg-muted cursor-not-allowed",
+        isDragging && "opacity-50"
+      )}
+    >
+      {/* Drag Handle */}
+      <div {...listeners} {...attributes} className="cursor-grab active:cursor-grabbing touch-none">
+        <GripVertical className="h-3 w-3 text-muted-foreground flex-shrink-0" />
+      </div>
 
-            <span className="flex-1 truncate">{field}</span>
-            <span className="text-[10px] text-muted-foreground">{isNumeric ? "num" : "text"}</span>
+      <span className="flex-1 truncate">{field}</span>
+      <span className="text-[10px] text-muted-foreground">{isNumeric ? "num" : "text"}</span>
 
-            {/* Checkbox - NOT draggable */}
-            <input type="checkbox" className="h-3 w-3 rounded border-input cursor-pointer" checked={isActive} onChange={onToggle} onClick={(e) => e.stopPropagation()} />
-        </div>
-    )
+      {/* Checkbox */}
+      <input type="checkbox" className="h-3 w-3 rounded border-input cursor-pointer" checked={isActive} onChange={onToggle} onClick={(e) => e.stopPropagation()} />
+    </div>
+  );
 }
+
 
 // Draggable pill component
 function DraggableFieldPill({ field, zone, onRemove }: { field: string; zone: "rows" | "columns"; onRemove: () => void }) {
