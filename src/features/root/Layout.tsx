@@ -1,16 +1,17 @@
-"use client"
 
 import { Button } from "@/components/ui/button"
-import * as React from "react"
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
-import { FileSpreadsheet, ChevronDown, RotateCcw, Upload } from "lucide-react"
-import { DefaultTable } from "./table-view/DefaltTable"
-import { UploadDialog } from "./upload/UploadDialog"
+import { FileSpreadsheet, ChevronDown, RotateCcw, Upload, Sidebar } from "lucide-react"
+import { UploadDialog } from "../upload/UploadDialog"
 import { usePivotStore } from "@/lib/store/pivot-store"
+import { useState } from "react"
+import { DefaultTable } from "../table-view/DefaltTable"
+import { SidebarControls } from "../sidebar/SidebarControls"
 
 export default function Layout() {
-  const [openUpload, setOpenUpload] = React.useState(false)
+  const [openUpload, setOpenUpload] = useState(false)
   const { data, fileName, clearData, showRaw } = usePivotStore()
+
 
   return (
     <main className="h-screen w-screen overflow-hidden flex flex-col">
@@ -64,10 +65,12 @@ export default function Layout() {
               </div>
             ) : showRaw ? (
               <DefaultTable />
+              // <></>
             ) : (
               <></>
             )}
           </div>
+          <SidebarControls fields={usePivotStore.getState().fields} className="border-l" />
         </div>
       </section>
 
