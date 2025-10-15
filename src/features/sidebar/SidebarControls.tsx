@@ -22,7 +22,7 @@ import { CSS } from "@dnd-kit/utilities"
 export const SidebarControls = ({ fields, className }: { fields: string[]; className?: string }) => {
     const railW = 48
     const panelW = 320
-    const [open, setOpen] = useState<{ viz: boolean; data: boolean }>({ viz: true, data: true })
+    const [open, setOpen] = useState<{ viz: boolean; data: boolean }>({ viz: false, data: false })
     const openCount = Number(open.viz) + Number(open.data)
     const width = railW + panelW * openCount
     const [activeId, setActiveId] = useState<string | null>(null)
