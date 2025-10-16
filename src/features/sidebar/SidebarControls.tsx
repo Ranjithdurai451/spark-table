@@ -57,6 +57,7 @@ export const SidebarControls = ({
     removeFromZone,
     numericFields,
     getZoneOfField,
+    clearZone, // Add this function to pivot-store (should clear a whole zone)
   } = usePivotStore();
 
   // Configure sensors with proper activation constraints
@@ -164,14 +165,19 @@ export const SidebarControls = ({
                   title="Rows"
                   items={rows}
                   emptyHint="Drag fields here"
+                  onClear={() => clearZone("rows")}
                 />
                 <DropZoneArea
                   id="columns"
                   title="Columns"
                   items={columns}
                   emptyHint="Drag fields here"
+                  onClear={() => clearZone("columns")}
                 />
-                <ValuesZoneArea items={values} />
+                <ValuesZoneArea
+                  items={values}
+                  onClear={() => clearZone("values")}
+                />
               </div>
             </PanelShell>
           )}
@@ -525,25 +531,41 @@ function DraggableFieldPill({
   );
 }
 
-// Drop zone component
+// Drop zone component with clear button
 function DropZoneArea({
   id,
   title,
   items,
   emptyHint,
+  onClear,
 }: {
   id: "rows" | "columns";
   title: string;
   items: string[];
   emptyHint: string;
+  onClear: () => void;
 }) {
   const { removeFromZone } = usePivotStore();
   const { setNodeRef, isOver } = useDroppable({ id });
 
   return (
     <div className="space-y-1.5">
-      <div className="text-[11px] font-medium text-muted-foreground uppercase tracking-wide">
-        {title}
+      <div className="flex justify-between items-center text-[11px] font-medium text-muted-foreground uppercase tracking-wide">
+        <span>{title}</span>
+        {items.length > 0 && (
+          <button
+            type="button"
+            className="text-xs text-destructive hover:text-destructive/80 cursor-pointer select-none"
+            onClick={(e) => {
+              e.stopPropagation();
+              onClear();
+            }}
+            aria-label={`Clear all in ${title}`}
+            title={`Clear all in ${title}`}
+          >
+            Clear
+          </button>
+        )}
       </div>
       <div
         ref={setNodeRef}
@@ -576,18 +598,34 @@ function DropZoneArea({
   );
 }
 
-// Values zone with aggregation
+// Values zone with clear and aggregation
 function ValuesZoneArea({
   items,
+  onClear,
 }: {
   items: { field: string; agg: string }[];
+  onClear: () => void;
 }) {
   const { setNodeRef, isOver } = useDroppable({ id: "values" });
 
   return (
     <div className="space-y-1.5">
-      <div className="text-[11px] font-medium text-muted-foreground uppercase tracking-wide">
-        Values
+      <div className="flex justify-between items-center text-[11px] font-medium text-muted-foreground uppercase tracking-wide">
+        <span>Values</span>
+        {items.length > 0 && (
+          <button
+            type="button"
+            className="text-xs text-destructive hover:text-destructive/80 cursor-pointer select-none"
+            onClick={(e) => {
+              e.stopPropagation();
+              onClear();
+            }}
+            aria-label="Clear all in Values"
+            title="Clear all in Values"
+          >
+            Clear
+          </button>
+        )}
       </div>
       <div
         ref={setNodeRef}

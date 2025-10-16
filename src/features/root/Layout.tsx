@@ -8,26 +8,14 @@ import {
 import { FileSpreadsheet, ChevronDown, RotateCcw, Upload } from "lucide-react";
 import { UploadDialog } from "../upload/UploadDialog";
 import { usePivotStore } from "@/lib/store/pivot-store";
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { DefaultTable } from "../table-view/DefaultTable";
 import { SidebarControls } from "../sidebar/SidebarControls";
+import { TableView } from "../table-view/TableView";
 
 export default function Layout() {
   const [openUpload, setOpenUpload] = useState(false);
-  const {
-    data,
-    fileName,
-    clearData,
-    showRaw,
-    numericFields,
-    dateFields,
-    groups,
-  } = usePivotStore();
-  useEffect(() => {
-    console.log("Numeric Fields:", numericFields);
-    console.log("Date Fields:", dateFields);
-    console.log("Groups:", groups);
-  }, [numericFields, dateFields, groups]);
+  const { data, fileName, clearData, showRaw } = usePivotStore();
 
   return (
     <main className="h-screen w-screen overflow-hidden flex flex-col">
@@ -93,11 +81,8 @@ export default function Layout() {
                   </div>
                 </div>
               </div>
-            ) : showRaw ? (
-              <DefaultTable />
             ) : (
-              // <></>
-              <></>
+              <TableView />
             )}
           </div>
           <div className="hidden md:block">
