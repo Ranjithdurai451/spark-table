@@ -9,13 +9,12 @@ import { FileSpreadsheet, ChevronDown, RotateCcw, Upload } from "lucide-react";
 import { UploadDialog } from "../upload/UploadDialog";
 import { usePivotStore } from "@/lib/store/pivot-store";
 import { useState } from "react";
-import { DefaultTable } from "../table-view/DefaultTable";
 import { SidebarControls } from "../sidebar/SidebarControls";
 import { TableView } from "../table-view/TableView";
 
 export default function Layout() {
   const [openUpload, setOpenUpload] = useState(false);
-  const { data, fileName, clearData, showRaw } = usePivotStore();
+  const { data, fileName, clearData } = usePivotStore();
 
   return (
     <main className="h-screen w-screen overflow-hidden flex flex-col">

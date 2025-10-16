@@ -45,7 +45,7 @@ export const SidebarControls = ({
   });
   const openCount = Number(open.viz) + Number(open.data);
   const width = railW + panelW * openCount;
-  const [activeId, setActiveId] = useState<string | null>(null);
+  const [_, setActiveId] = useState<string | null>(null);
   const [activeField, setActiveField] = useState<string | null>(null);
 
   const {

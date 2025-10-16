@@ -220,7 +220,7 @@ export const PivotTable = () => {
         <table className="w-full border-collapse select-text">
           <thead>
             <tr>
-              {allColumns.map((col, idx) => (
+              {allColumns.map((col) => (
                 <th
                   key={col}
                   className="px-3 py-2 h-10 text-xs font-semibold tracking-wide uppercase text-muted-foreground bg-muted border-b border-border sticky top-0 z-10 border-r border-l"

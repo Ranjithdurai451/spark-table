@@ -240,7 +240,7 @@ export const usePivotStore = create<PivotState>((set, get) => ({
   // Inside your usePivotStore create function
 
   clearZone: (zone: Exclude<Zone, "data">) => {
-    set((s) => {
+    set(() => {
       if (zone === "rows") {
         return { rows: [], showRaw: false };
       } else if (zone === "columns") {
