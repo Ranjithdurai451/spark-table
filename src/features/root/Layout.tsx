@@ -18,8 +18,8 @@ export default function Layout() {
 
   return (
     <main className="h-screen w-screen overflow-hidden flex flex-col">
-      <header className="h-12 border-b flex items-center justify-between px-3 flex-shrink-0">
-        <h1 className="text-sm font-semibold tracking-wide">SparkTable</h1>
+      <header className=" border-b flex items-center justify-between py-3 px-5 flex-shrink-0">
+        <h1 className="text-lg text-primary/60 font-semibold tracking-wide"><span className="text-primary font-bold">Spark</span>Table</h1>
         <div className="flex items-center gap-2">
           {data.length === 0 ? (
             <Button size="sm" onClick={() => setOpenUpload(true)}>
@@ -68,12 +68,16 @@ export default function Layout() {
               </div>
             ) : showRaw ? (
               <DefaultTable />
+         
               // <></>
             ) : (
               <></>
             )}
           </div>
+              <div className="hidden md:block">
+
           <SidebarControls fields={usePivotStore.getState().fields} className="border-l" />
+          </div>
         </div>
       </section>
 

@@ -163,7 +163,7 @@ export const UploadDialog = ({ open, onOpenChange }: { open: boolean; onOpenChan
           )}
 
           {uploadedFileName && !busy && !error && (
-            <p className="text-success text-sm ml-4 flex-grow truncate" title={uploadedFileName}>
+            <p className="text-success max-w-[28ch]  text-sm ml-4 flex-grow truncate" title={uploadedFileName}>
               Uploaded: {uploadedFileName}
             </p>
           )}

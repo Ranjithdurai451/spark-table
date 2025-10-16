@@ -71,10 +71,10 @@ export const DefaultTable = () => {
     <div className="w-full h-full border border-border rounded-md overflow-hidden bg-background">
       <div
         ref={tableContainerRef}
-        className="overflow-auto h-[600px] scrollbar-thin"
+        className="overflow-auto h-[600px]"
         style={{
           scrollbarWidth: 'thin',
-          scrollbarColor: 'rgba(155, 155, 155, 0.5) transparent'
+          scrollbarColor: 'hsl(var(--muted-foreground) / 0.3) transparent'
         }}
       >
         <table className="w-full border-collapse">
