@@ -1,21 +1,21 @@
-import { useMemo, useRef, useState } from "react"
+import { useMemo, useRef, useState } from "react";
 import {
   flexRender,
   getCoreRowModel,
   getSortedRowModel,
   type SortingState,
   useReactTable,
-} from "@tanstack/react-table"
-import { useVirtualizer } from "@tanstack/react-virtual"
-import { usePivotStore } from "@/lib/store/pivot-store"
-import { ArrowUp, ArrowDown } from "lucide-react"
+} from "@tanstack/react-table";
+import { useVirtualizer } from "@tanstack/react-virtual";
+import { usePivotStore } from "@/lib/store/pivot-store";
+import { ArrowUp, ArrowDown } from "lucide-react";
 
 export const DefaultTable = () => {
-  const data = usePivotStore((state) => state.data)
-  const fields = usePivotStore((state) => state.fields)
-  
-  const [sorting, setSorting] = useState<SortingState>([])
-  const tableContainerRef = useRef<HTMLDivElement>(null)
+  const data = usePivotStore((state) => state.data);
+  const fields = usePivotStore((state) => state.fields);
+
+  const [sorting, setSorting] = useState<SortingState>([]);
+  const tableContainerRef = useRef<HTMLDivElement>(null);
 
   const columns = useMemo(
     () =>
@@ -28,13 +28,15 @@ export const DefaultTable = () => {
           >
             {f}
             {column.getIsSorted() === "asc" && <ArrowUp className="h-3 w-3" />}
-            {column.getIsSorted() === "desc" && <ArrowDown className="h-3 w-3" />}
+            {column.getIsSorted() === "desc" && (
+              <ArrowDown className="h-3 w-3" />
+            )}
           </button>
         ),
         cell: (ctx: any) => String(ctx.getValue() ?? ""),
       })),
     [fields]
-  )
+  );
 
   const table = useReactTable({
     data,
@@ -45,27 +47,27 @@ export const DefaultTable = () => {
     state: {
       sorting,
     },
-  })
+  });
 
-  const { rows } = table.getRowModel()
+  const { rows } = table.getRowModel();
 
   const rowVirtualizer = useVirtualizer({
     count: rows.length,
     getScrollElement: () => tableContainerRef.current,
     estimateSize: () => 33,
     overscan: 10,
-  })
+  });
 
-  const virtualRows = rowVirtualizer.getVirtualItems()
-  const totalSize = rowVirtualizer.getTotalSize()
+  const virtualRows = rowVirtualizer.getVirtualItems();
+  const totalSize = rowVirtualizer.getTotalSize();
 
-  const paddingTop = virtualRows.length > 0 ? virtualRows?.[0]?.start || 0 : 0
+  const paddingTop = virtualRows.length > 0 ? virtualRows?.[0]?.start || 0 : 0;
   const paddingBottom =
     virtualRows.length > 0
       ? totalSize - (virtualRows?.[virtualRows.length - 1]?.end || 0)
-      : 0
+      : 0;
 
-  if (data.length === 0) return null
+  if (data.length === 0) return null;
 
   return (
     <div className="w-full h-full border border-border rounded-md overflow-hidden bg-background">
@@ -73,8 +75,8 @@ export const DefaultTable = () => {
         ref={tableContainerRef}
         className="overflow-auto h-[600px]"
         style={{
-          scrollbarWidth: 'thin',
-          scrollbarColor: 'hsl(var(--muted-foreground) / 0.3) transparent'
+          scrollbarWidth: "thin",
+          scrollbarColor: "hsl(var(--muted-foreground) / 0.3) transparent",
         }}
       >
         <table className="w-full border-collapse">
@@ -102,7 +104,7 @@ export const DefaultTable = () => {
               </tr>
             )}
             {virtualRows.map((virtualRow) => {
-              const row = rows[virtualRow.index]
+              const row = rows[virtualRow.index];
               return (
                 <tr
                   key={row.id}
@@ -120,7 +122,7 @@ export const DefaultTable = () => {
                     </td>
                   ))}
                 </tr>
-              )
+              );
             })}
             {paddingBottom > 0 && (
               <tr>
@@ -131,5 +133,5 @@ export const DefaultTable = () => {
         </table>
       </div>
     </div>
-  )
-}
+  );
+};

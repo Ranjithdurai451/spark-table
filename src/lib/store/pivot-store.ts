@@ -1,5 +1,3 @@
-"use client"
-
 import { create } from "zustand"
 
 export type Agg = "sum" | "avg" | "count"
@@ -7,18 +5,20 @@ export type Zone = "rows" | "columns" | "values" | "data"
 
 type ValueItem = { field: string; agg: Agg }
 
-// Customize grouping type as needed, here kept generic
-type Grouping = Record<string, any>
+type FieldMetadata = {
+  numericFields: string[]
+  dateFields: string[]
+  groups: Record<string, Set<any>>
+}
 
 type State = {
   data: any[]
   fields: string[]
   numericFields: string[]
   dateFields: string[]
+  groups: Record<string, Set<any>>
   rows: string[]
   columns: string[]
-  rowsGroups: Grouping
-  columnsGroups: Grouping
   values: ValueItem[]
   fileName?: string
   showRaw: boolean
@@ -36,33 +36,98 @@ type State = {
   removeValueField: (field: string) => void
 
   setShowRaw: (v: boolean) => void
-
-  setRowsGroups: (groups: Grouping) => void
-  setColumnsGroups: (groups: Grouping) => void
 }
 
-// Util: Check if mostly numeric in rows for a field (threshold default 80%)
-function isMostlyNumericField(rows: any[], field: string, threshold = 0.8): boolean {
-  const numericCount = rows.reduce((count, row) => {
-    const val = row[field]
-    if (val !== null && val !== undefined && val !== '' && isFinite(Number(val))) {
-      return count + 1
-    }
-    return count
-  }, 0)
-  return rows.length > 0 && numericCount / rows.length >= threshold
+// Stricter date validation for CSV data
+function isLikelyDate(val: any): boolean {
+  if (val === null || val === undefined || val === '') return false
+  
+  const str = String(val).trim()
+  
+  // Reject pure numbers (Excel date codes, IDs, etc.)
+  if (/^\d+$/.test(str)) return false
+  
+  // Reject if too short (less than 8 chars like "1/1/2020")
+  if (str.length < 6) return false
+  
+  // Only accept common date formats
+  const commonDateFormats = [
+    /^\d{4}-\d{2}-\d{2}/, // YYYY-MM-DD
+    /^\d{4}\/\d{2}\/\d{2}/, // YYYY/MM/DD
+    /^\d{1,2}\/\d{1,2}\/\d{4}/, // M/D/YYYY or MM/DD/YYYY
+    /^\d{1,2}-\d{1,2}-\d{4}/, // M-D-YYYY or MM-DD-YYYY
+    /^\d{4}-\d{2}-\d{2}T/, // ISO 8601
+    /^\d{1,2}\s+(Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)/i, // "1 Jan 2020"
+  ]
+  
+  const matchesFormat = commonDateFormats.some(regex => regex.test(str))
+  if (!matchesFormat) return false
+  
+  // Additional validation: must parse to valid date
+  const parsed = Date.parse(str)
+  if (isNaN(parsed)) return false
+  
+  // Sanity check: date should be between 1900 and 2100
+  const date = new Date(parsed)
+  const year = date.getFullYear()
+  return year >= 1900 && year <= 2100
 }
 
-// Util: Check if mostly date in rows for a field (threshold default 80%)
-function isMostlyDateField(rows: any[], field: string, threshold = 0.8): boolean {
-  const dateCount = rows.reduce((count, row) => {
-    const val = row[field]
-    if (val !== null && val !== undefined && val !== '' && !isNaN(Date.parse(val))) {
-      return count + 1
-    }
-    return count
-  }, 0)
-  return rows.length > 0 && dateCount / rows.length >= threshold
+// Single-pass field inference with metadata
+function inferFieldsMetadata(rows: any[]): FieldMetadata {
+  if (rows.length === 0) {
+    return { numericFields: [], dateFields: [], groups: {} }
+  }
+  
+  const fields = Object.keys(rows[0])
+  const totalRows = rows.length
+  const threshold = 0.8
+  
+  // Single-pass reduce operation
+  const metadata = fields.reduce<FieldMetadata>(
+    (acc, field) => {
+      let numericCount = 0
+      let dateCount = 0
+      const uniqueValues = new Set<any>()
+      
+      // Process all rows for this field in one pass
+      rows.forEach((row) => {
+        const val = row[field]
+        
+        // Track unique values for grouping
+        if (val !== null && val !== undefined && val !== '') {
+          uniqueValues.add(val)
+        }
+        
+        // Check if numeric
+        if (val !== null && val !== undefined && val !== '' && isFinite(Number(val))) {
+          numericCount++
+        }
+        
+        // Check if date (with strict validation)
+        if (isLikelyDate(val)) {
+          dateCount++
+        }
+      })
+      
+      // Determine field types based on threshold
+      if (numericCount / totalRows >= threshold) {
+        acc.numericFields.push(field)
+      }
+      
+      if (dateCount / totalRows >= threshold) {
+        acc.dateFields.push(field)
+      }
+      
+      // Store unique values for pivot operations
+      acc.groups[field] = uniqueValues
+      
+      return acc
+    },
+    { numericFields: [], dateFields: [], groups: {} }
+  )
+  
+  return metadata
 }
 
 // Infer fields from first row keys
@@ -86,29 +151,23 @@ export const usePivotStore = create<State>((set, get) => ({
   fields: [],
   numericFields: [],
   dateFields: [],
+  groups: {},
   rows: [],
   columns: [],
-  rowsGroups: {},
-  columnsGroups: {},
   values: [],
   fileName: undefined,
   showRaw: true,
 
   setData(rows, fileName) {
     const fields = inferFields(rows)
-    const numericFields = fields.filter((f) => isMostlyNumericField(rows, f))
-    const dateFields = fields.filter((f) => isMostlyDateField(rows, f))
-
-    const rowsGroups: Grouping = {}
-    const columnsGroups: Grouping = {}
+    const { numericFields, dateFields, groups } = inferFieldsMetadata(rows)
 
     set({
       data: rows,
       fields,
       numericFields,
       dateFields,
-      rowsGroups,
-      columnsGroups,
+      groups,
       fileName,
       showRaw: true,
       rows: [],
@@ -123,10 +182,9 @@ export const usePivotStore = create<State>((set, get) => ({
       fields: [],
       numericFields: [],
       dateFields: [],
+      groups: {},
       rows: [],
       columns: [],
-      rowsGroups: {},
-      columnsGroups: {},
       values: [],
       fileName: undefined,
       showRaw: true,
@@ -205,13 +263,5 @@ export const usePivotStore = create<State>((set, get) => ({
 
   setShowRaw(v) {
     set({ showRaw: v })
-  },
-
-  setRowsGroups(groups) {
-    set({ rowsGroups: groups })
-  },
-
-  setColumnsGroups(groups) {
-    set({ columnsGroups: groups })
   },
 }))
