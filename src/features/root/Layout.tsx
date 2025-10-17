@@ -17,11 +17,14 @@ export default function Layout() {
   const { data, fileName, clearData } = usePivotStore();
 
   return (
-    <main className="h-screen w-screen overflow-hidden flex flex-col">
-      <header className=" border-b flex items-center justify-between py-3 px-5 flex-shrink-0">
-        <h1 className="text-lg text-primary/60 font-semibold tracking-wide">
+    <main className="h-dvh w-dvw overflow-hidden flex flex-col">
+      <header className="border-b flex items-center justify-between py-3 px-5 flex-shrink-0">
+        <a
+          href=""
+          className="text-lg text-primary/60 font-semibold tracking-wide"
+        >
           <span className="text-primary font-bold">Spark</span>Table
-        </h1>
+        </a>
         <div className="flex items-center gap-2">
           {data.length === 0 ? (
             <Button size="sm" onClick={() => setOpenUpload(true)}>
@@ -60,11 +63,11 @@ export default function Layout() {
         </div>
       </header>
 
-      <section className="flex-1 overflow-hidden">
-        <div className="h-full grid grid-cols-[1fr_auto]">
-          <div className="h-full overflow-hidden p-4">
+      <section className="flex-1 min-h-0 flex flex-row">
+        <div className="h-full flex-1 p-4 min-w-0">
+          <div className="h-full w-full rounded border overflow-hidden flex flex-col">
             {data.length === 0 ? (
-              <div className="h-full w-full rounded-lg border flex items-center justify-center">
+              <div className="flex-1 flex items-center justify-center">
                 <div className="text-center space-y-2">
                   <p className="text-lg font-medium">
                     Upload a CSV or Excel file to get started!
@@ -84,12 +87,12 @@ export default function Layout() {
               <TableView />
             )}
           </div>
-          <div className="hidden md:block">
-            <SidebarControls
-              fields={usePivotStore.getState().fields}
-              className="border-l"
-            />
-          </div>
+        </div>
+        <div className="hidden md:block flex-shrink-0">
+          <SidebarControls
+            fields={usePivotStore.getState().fields}
+            className="border-l"
+          />
         </div>
       </section>
 

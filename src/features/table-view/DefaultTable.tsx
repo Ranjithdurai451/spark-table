@@ -1,38 +1,24 @@
-import { useMemo, useRef, useState } from "react";
+import { useMemo, useState } from "react";
 import {
   flexRender,
   getCoreRowModel,
-  getSortedRowModel,
-  type SortingState,
   useReactTable,
 } from "@tanstack/react-table";
-import { useVirtualizer } from "@tanstack/react-virtual";
 import { usePivotStore } from "@/lib/store/pivot-store";
-import { ArrowUp, ArrowDown } from "lucide-react";
+import { Pagination } from "./Pagination";
 
 export const DefaultTable = () => {
   const data = usePivotStore((state) => state.data);
   const fields = usePivotStore((state) => state.fields);
 
-  const [sorting, setSorting] = useState<SortingState>([]);
-  const tableContainerRef = useRef<HTMLDivElement>(null);
+  const [page, setPage] = useState(1);
+  const pageSize = 40;
 
   const columns = useMemo(
     () =>
       fields.map((f) => ({
         accessorKey: f,
-        header: ({ column }: any) => (
-          <button
-            className="flex items-center gap-1 text-xs font-medium hover:text-foreground/70 transition-colors"
-            onClick={() => column.toggleSorting(column.getIsSorted() === "asc")}
-          >
-            {f}
-            {column.getIsSorted() === "asc" && <ArrowUp className="h-3 w-3" />}
-            {column.getIsSorted() === "desc" && (
-              <ArrowDown className="h-3 w-3" />
-            )}
-          </button>
-        ),
+        header: f,
         cell: (ctx: any) => String(ctx.getValue() ?? ""),
       })),
     [fields]
@@ -42,51 +28,30 @@ export const DefaultTable = () => {
     data,
     columns,
     getCoreRowModel: getCoreRowModel(),
-    getSortedRowModel: getSortedRowModel(),
-    onSortingChange: setSorting,
-    state: {
-      sorting,
-    },
   });
 
   const { rows } = table.getRowModel();
-
-  const rowVirtualizer = useVirtualizer({
-    count: rows.length,
-    getScrollElement: () => tableContainerRef.current,
-    estimateSize: () => 33,
-    overscan: 10,
-  });
-
-  const virtualRows = rowVirtualizer.getVirtualItems();
-  const totalSize = rowVirtualizer.getTotalSize();
-
-  const paddingTop = virtualRows.length > 0 ? virtualRows?.[0]?.start || 0 : 0;
-  const paddingBottom =
-    virtualRows.length > 0
-      ? totalSize - (virtualRows?.[virtualRows.length - 1]?.end || 0)
-      : 0;
+  const totalRows = rows.length;
+  const startIdx = (page - 1) * pageSize;
+  const pagedRows = rows.slice(startIdx, startIdx + pageSize);
 
   if (data.length === 0) return null;
 
   return (
-    <div className="w-full h-full border border-border rounded-md overflow-hidden bg-background">
-      <div
-        ref={tableContainerRef}
-        className="overflow-auto h-[600px]"
-        style={{
-          scrollbarWidth: "thin",
-          scrollbarColor: "hsl(var(--muted-foreground) / 0.3) transparent",
-        }}
-      >
+    <div className="w-full h-full flex flex-col">
+      <div className="flex-1 min-h-0 overflow-auto scrollbar-thin">
         <table className="w-full border-collapse">
-          <thead className="bg-muted sticky top-0 z-10">
+          <thead className="sticky top-0 z-10">
             {table.getHeaderGroups().map((headerGroup) => (
               <tr key={headerGroup.id}>
                 {headerGroup.headers.map((header) => (
                   <th
                     key={header.id}
-                    className="px-3 py-2 text-left text-xs font-medium border-b border-r border-border last:border-r-0"
+                    className="px-3 py-2 text-left border-b border-r border-border bg-muted font-semibold text-xs uppercase tracking-wide last:border-r-0"
+                    style={{
+                      whiteSpace: "nowrap",
+                      letterSpacing: "0.01em",
+                    }}
                   >
                     {flexRender(
                       header.column.columnDef.header,
@@ -98,40 +63,38 @@ export const DefaultTable = () => {
             ))}
           </thead>
           <tbody>
-            {paddingTop > 0 && (
-              <tr>
-                <td style={{ height: `${paddingTop}px` }} />
+            {pagedRows.map((row, i) => (
+              <tr
+                key={row.id}
+                className={`transition-colors hover:bg-accent/30 ${
+                  i % 2 ? "bg-muted/[0.028]" : ""
+                }`}
+              >
+                {row.getVisibleCells().map((cell) => (
+                  <td
+                    key={cell.id}
+                    className="px-3 py-2 text-xs border-b border-r border-border last:border-r-0"
+                    style={{
+                      maxWidth: "256px",
+                      whiteSpace: "nowrap",
+                      overflow: "hidden",
+                      textOverflow: "ellipsis",
+                    }}
+                  >
+                    {flexRender(cell.column.columnDef.cell, cell.getContext())}
+                  </td>
+                ))}
               </tr>
-            )}
-            {virtualRows.map((virtualRow) => {
-              const row = rows[virtualRow.index];
-              return (
-                <tr
-                  key={row.id}
-                  className="hover:bg-accent/30 transition-colors"
-                >
-                  {row.getVisibleCells().map((cell) => (
-                    <td
-                      key={cell.id}
-                      className="px-3 py-2 text-xs border-b border-r border-border last:border-r-0"
-                    >
-                      {flexRender(
-                        cell.column.columnDef.cell,
-                        cell.getContext()
-                      )}
-                    </td>
-                  ))}
-                </tr>
-              );
-            })}
-            {paddingBottom > 0 && (
-              <tr>
-                <td style={{ height: `${paddingBottom}px` }} />
-              </tr>
-            )}
+            ))}
           </tbody>
         </table>
       </div>
+      <Pagination
+        page={page}
+        pageSize={pageSize}
+        total={totalRows}
+        setPage={setPage}
+      />
     </div>
   );
 };

@@ -1,37 +1,45 @@
-import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import * as XLSX from "xlsx";
 import { usePivotStore } from "@/lib/store/pivot-store";
 import { useRef, useState } from "react";
 
-export const UploadDialog = ({ open, onOpenChange }: { open: boolean; onOpenChange: (open: boolean) => void }) => {
+export const UploadDialog = ({
+  open,
+  onOpenChange,
+}: {
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+}) => {
   const { setData, clearData } = usePivotStore();
-  const [busy, setBusy] = useState(false);
-  const [progress, setProgress] = useState(0); // Simulated for UX improvement
+
   const inputRef = useRef<HTMLInputElement>(null);
+
+  const [busy, setBusy] = useState(false);
+  const [progress, setProgress] = useState(0);
   const [error, setError] = useState<string | null>(null);
   const [dragActive, setDragActive] = useState(false);
-  const [uploadedFileName, setUploadedFileName] = useState<string | null>(null);
-  const [success, setSuccess] = useState(false);
 
+  // simulate upload progress for UX
   const simulateProgress = () => {
     setProgress(0);
-    setSuccess(false);
     let p = 0;
     const interval = setInterval(() => {
       p += 10;
       setProgress(p);
-      if (p >= 100) {
-        clearInterval(interval);
-        setSuccess(true);
-      }
+      if (p >= 100) clearInterval(interval);
     }, 100);
   };
 
   const processFile = async (file: File) => {
     setBusy(true);
     setError(null);
-    setUploadedFileName(null);
     clearData();
     simulateProgress();
 
@@ -44,25 +52,23 @@ export const UploadDialog = ({ open, onOpenChange }: { open: boolean; onOpenChan
 
       const firstSheetName = workbook.SheetNames[0];
       const worksheet = workbook.Sheets[firstSheetName];
-      const rows = XLSX.utils.sheet_to_json<Record<string, unknown>>(worksheet, {
-        defval: null,
-        raw: false,
-      });
+      const rows = XLSX.utils.sheet_to_json<Record<string, unknown>>(
+        worksheet,
+        {
+          defval: null,
+          raw: false,
+        }
+      );
 
       setTimeout(() => {
-        console.log("Parsed rows:", rows);
-        setData(rows, file.name);
-        setUploadedFileName(file.name);
+        setData(rows, file.name); // Zustand handles file name + data
         onOpenChange(false);
         setBusy(false);
-      }, 1100); // match simulated progress duration
-      if (inputRef.current) {
-        inputRef.current.value = "";
-      }
+        if (inputRef.current) inputRef.current.value = "";
+      }, 1100);
     } catch (e: unknown) {
-      setBusy(false);
       setError(e instanceof Error ? e.message : "Failed to parse file");
-      setSuccess(false);
+      setBusy(false);
       setProgress(0);
     } finally {
       setDragActive(false);
@@ -79,7 +85,9 @@ export const UploadDialog = ({ open, onOpenChange }: { open: boolean; onOpenChan
       <DialogContent className="sm:max-w-md">
         <DialogHeader>
           <DialogTitle>Upload data</DialogTitle>
-          <DialogDescription>Drag-and-drop a CSV, XLSX, or XLS file, or click to choose one.</DialogDescription>
+          <DialogDescription>
+            Drag-and-drop a CSV, XLSX, or XLS file, or click to choose one.
+          </DialogDescription>
         </DialogHeader>
 
         <div
@@ -103,20 +111,19 @@ export const UploadDialog = ({ open, onOpenChange }: { open: boolean; onOpenChan
           aria-label="Upload area"
           aria-disabled={busy}
           onKeyDown={(e) => {
-            if (!busy && (e.key === "Enter" || e.key === " ")) inputRef.current?.click();
+            if (!busy && (e.key === "Enter" || e.key === " "))
+              inputRef.current?.click();
           }}
         >
           <p className="text-sm">
-            {busy
-              ? success
-                ? "Upload complete"
-                : "Processing file..."
-              : "Drop file here or click to browse"}
+            {busy ? "Processing file..." : "Drop file here or click to browse"}
           </p>
-          <p className="text-xs text-muted-foreground pt-1">CSV, XLSX, XLS supported</p>
+          <p className="text-xs text-muted-foreground pt-1">
+            CSV, XLSX, XLS supported
+          </p>
 
-          {/* Progress bar at bottom */}
-          {busy && !success && (
+          {/* Progress bar */}
+          {busy && (
             <div className="absolute bottom-0 left-0 h-1 bg-muted w-full rounded-b-md overflow-hidden mt-2">
               <div
                 className="h-full bg-primary transition-all duration-200 ease-in-out"
@@ -127,17 +134,6 @@ export const UploadDialog = ({ open, onOpenChange }: { open: boolean; onOpenChan
                 role="progressbar"
                 aria-label="Upload progress"
               />
-            </div>
-          )}
-
-          {/* Success checkmark */}
-          {success && (
-            <div
-              className="absolute top-2 right-2 text-green-600"
-              aria-live="polite"
-              aria-label="Upload succeeded"
-            >
-              ✓
             </div>
           )}
         </div>
@@ -152,19 +148,17 @@ export const UploadDialog = ({ open, onOpenChange }: { open: boolean; onOpenChan
         />
 
         <div className="flex justify-between items-center mt-4">
-          <Button variant="secondary" onClick={() => onOpenChange(false)} disabled={busy}>
+          <Button
+            variant="secondary"
+            onClick={() => onOpenChange(false)}
+            disabled={busy}
+          >
             Cancel
           </Button>
 
           {error && (
             <p className="text-destructive text-sm ml-4 flex-grow" role="alert">
               {error}
-            </p>
-          )}
-
-          {uploadedFileName && !busy && !error && (
-            <p className="text-success max-w-[28ch]  text-sm ml-4 flex-grow truncate" title={uploadedFileName}>
-              Uploaded: {uploadedFileName}
             </p>
           )}
         </div>

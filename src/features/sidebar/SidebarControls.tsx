@@ -23,7 +23,6 @@ import {
 } from "@dnd-kit/core";
 import { useDraggable, useDroppable } from "@dnd-kit/core";
 
-// Utility to create unique IDs for draggable items
 const createDragId = (zone: string, field: string) => `${zone}:${field}`;
 const parseDragId = (id: string) => {
   const [zone, ...fieldParts] = id.split(":");
@@ -40,8 +39,8 @@ export const SidebarControls = ({
   const railW = 48;
   const panelW = 320;
   const [open, setOpen] = useState<{ viz: boolean; data: boolean }>({
-    viz: false,
-    data: false,
+    viz: true,
+    data: true,
   });
   const openCount = Number(open.viz) + Number(open.data);
   const width = railW + panelW * openCount;
@@ -401,7 +400,6 @@ function DataPanel({ fields }: { fields: string[] }) {
   );
 }
 
-// Draggable field in data panel
 function DataFieldItem({
   field,
   isActive,
@@ -467,7 +465,6 @@ function DataFieldItem({
   );
 }
 
-// Draggable pill component
 function DraggableFieldPill({
   field,
   zone,
