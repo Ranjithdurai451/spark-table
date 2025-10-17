@@ -114,7 +114,7 @@ export function aggregateData(
   console.log("Rows:", rows);
   // Step 1: Group data by row keys
   const rowDataMap = new Map<string, any[]>();
-  data.forEach((row, i) => {
+  data.forEach((row) => {
     // if (i == 0) console.log("Sample data row:", row);
     const rowKey = rows.map((r) => String(row[r] ?? "N/A")).join("|||");
     if (!rowDataMap.has(rowKey)) rowDataMap.set(rowKey, []);
