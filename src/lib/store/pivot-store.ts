@@ -5,18 +5,11 @@ export type Zone = "rows" | "columns" | "values" | "data";
 
 type ValueItem = { field: string; agg: Agg };
 
-type FieldMetadata = {
-  numericFields: string[];
-  dateFields: string[];
-  groups: Record<string, Set<any>>;
-};
-
 export type PivotState = {
   data: any[];
   fields: string[];
   numericFields: string[];
   dateFields: string[];
-  groups: Record<string, Set<any>>;
   rows: string[];
   columns: string[];
   values: ValueItem[];
@@ -78,66 +71,50 @@ function isLikelyDate(val: any): boolean {
   return year >= 1900 && year <= 2100;
 }
 
-// Single-pass field inference with metadata
-function inferFieldsMetadata(rows: any[]): FieldMetadata {
+// Single-pass field inference with metadata (no groups collection)
+function inferFieldsMetadata(rows: any[]) {
   if (rows.length === 0) {
-    return { numericFields: [], dateFields: [], groups: {} };
+    return { numericFields: [], dateFields: [] };
   }
 
   const fields = Object.keys(rows[0]);
   const totalRows = rows.length;
   const threshold = 0.8;
 
-  // Single-pass reduce operation
-  const metadata = fields.reduce<FieldMetadata>(
-    (acc, field) => {
-      let numericCount = 0;
-      let dateCount = 0;
-      const uniqueValues = new Set<any>();
+  const numericFields: string[] = [];
+  const dateFields: string[] = [];
 
-      // Process all rows for this field in one pass
-      rows.forEach((row) => {
-        const val = row[field];
+  fields.forEach((field) => {
+    let numericCount = 0;
+    let dateCount = 0;
 
-        // Track unique values for grouping
-        if (val !== null && val !== undefined && val !== "") {
-          uniqueValues.add(val);
-        }
+    rows.forEach((row) => {
+      const val = row[field];
 
-        // Check if numeric
-        if (
-          val !== null &&
-          val !== undefined &&
-          val !== "" &&
-          isFinite(Number(val))
-        ) {
-          numericCount++;
-        }
-
-        // Check if date (with strict validation)
-        if (isLikelyDate(val)) {
-          dateCount++;
-        }
-      });
-
-      // Determine field types based on threshold
-      if (numericCount / totalRows >= threshold) {
-        acc.numericFields.push(field);
+      if (
+        val !== null &&
+        val !== undefined &&
+        val !== "" &&
+        isFinite(Number(val))
+      ) {
+        numericCount++;
       }
 
-      if (dateCount / totalRows >= threshold) {
-        acc.dateFields.push(field);
+      if (isLikelyDate(val)) {
+        dateCount++;
       }
+    });
 
-      // Store unique values for pivot operations
-      acc.groups[field] = uniqueValues;
+    if (numericCount / totalRows >= threshold) {
+      numericFields.push(field);
+    }
 
-      return acc;
-    },
-    { numericFields: [], dateFields: [], groups: {} }
-  );
+    if (dateCount / totalRows >= threshold) {
+      dateFields.push(field);
+    }
+  });
 
-  return metadata;
+  return { numericFields, dateFields };
 }
 
 // Infer fields from first row keys
@@ -161,7 +138,6 @@ export const usePivotStore = create<PivotState>((set, get) => ({
   fields: [],
   numericFields: [],
   dateFields: [],
-  groups: {},
   rows: [],
   columns: [],
   values: [],
@@ -170,14 +146,13 @@ export const usePivotStore = create<PivotState>((set, get) => ({
 
   setData(rows, fileName) {
     const fields = inferFields(rows);
-    const { numericFields, dateFields, groups } = inferFieldsMetadata(rows);
+    const { numericFields, dateFields } = inferFieldsMetadata(rows);
 
     set({
       data: rows,
       fields,
       numericFields,
       dateFields,
-      groups,
       fileName,
       showRaw: true,
       rows: [],
@@ -192,7 +167,6 @@ export const usePivotStore = create<PivotState>((set, get) => ({
       fields: [],
       numericFields: [],
       dateFields: [],
-      groups: {},
       rows: [],
       columns: [],
       values: [],
@@ -237,7 +211,6 @@ export const usePivotStore = create<PivotState>((set, get) => ({
     }
     set({ [zone]: (s[zone] as string[]).filter((f) => f !== field) } as any);
   },
-  // Inside your usePivotStore create function
 
   clearZone: (zone: Exclude<Zone, "data">) => {
     set(() => {

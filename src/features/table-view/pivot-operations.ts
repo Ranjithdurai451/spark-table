@@ -107,86 +107,123 @@ export function aggregateData(
       valueCols: [],
       widths: {},
     };
-  let effectiveValues = values.length
+
+  const effectiveValues = values.length
     ? values
     : [{ field: "value", agg: "count" }];
-  const colSet = new Set<string>();
-  const dataMap = new Map<string, Map<string, any[]>>();
-  data.forEach((row) => {
+  console.log("Rows:", rows);
+  // Step 1: Group data by row keys
+  const rowDataMap = new Map<string, any[]>();
+  data.forEach((row, i) => {
+    // if (i == 0) console.log("Sample data row:", row);
     const rowKey = rows.map((r) => String(row[r] ?? "N/A")).join("|||");
-    const colKeyParts = cols.map((c) => String(row[c] ?? "N/A"));
-    effectiveValues.forEach((val) => {
-      const colKey = [...colKeyParts, `${val.field}(${val.agg})`].join("|||");
-      colSet.add(colKey);
-      if (!dataMap.has(rowKey)) dataMap.set(rowKey, new Map());
-      const groupMap = dataMap.get(rowKey)!;
-      if (!groupMap.has(colKey)) groupMap.set(colKey, []);
-      groupMap.get(colKey)!.push(row);
-    });
+    if (!rowDataMap.has(rowKey)) rowDataMap.set(rowKey, []);
+    rowDataMap.get(rowKey)!.push(row);
   });
-  const allRowKeys = Array.from(dataMap.keys());
-  const allColKeys = Array.from(colSet);
+  // console.log("Row groups formed:", rowDataMap.size);
+  // console.log("Row groups sample:", rowDataMap.entries());
 
-  // If no data but rows present, show empty group structure
-  let emptyRowCombos: string[] = [];
-  if (allRowKeys.length === 0 && rows.length > 0 && data.length) {
+  // Step 2: Generate all possible column keys based on cols and aggregation values
+  const colKeysSet = new Set<string>();
+  data.forEach((row) => {
+    const colKeyBase = cols.map((c) => String(row[c] ?? "N/A"));
+    for (const val of effectiveValues) {
+      const colKey = [...colKeyBase, `${val.field}(${val.agg})`].join("|||");
+      colKeysSet.add(colKey);
+    }
+  });
+  const colKeys = Array.from(colKeysSet);
+  // console.log("Column keys formed:", colKeys.length);
+  // console.log("Column keys:", colKeys);
+
+  // Step 3: Aggregate per row group and col group
+  const table = [];
+  if (rowDataMap.size > 0) {
+    for (const [rowKey, rowsGroup] of rowDataMap.entries()) {
+      console.log("Processing row group:", rowKey, "with", rowsGroup, "rows");
+      const rowObj: Record<string, any> = {};
+      const rowKeyParts = rowKey.split("|||");
+      rows.forEach((r, idx) => {
+        rowObj[r] = rowKeyParts[idx];
+      });
+      // console.log("Aggregating for row group:", rowKeyParts);
+
+      // For column keys, filter data rows that match and aggregate
+      for (const colKey of colKeys) {
+        const colParts = colKey.split("|||");
+        const aggPart = colParts[colParts.length - 1];
+        const colGroupParts = colParts.slice(0, colParts.length - 1);
+
+        // Filter rowsGroup matching column group keys:
+        const filteredRows = rowsGroup.filter((row) =>
+          colGroupParts.every(
+            (part, idx) => String(row[cols[idx]] ?? "N/A") === part
+          )
+        );
+
+        const match = aggPart.match(/(.+)\((sum|avg|min|max|count)\)$/);
+        let field = "";
+        let agg = "";
+        if (match) {
+          field = match[1];
+          agg = match[2];
+        }
+
+        let val: any = "";
+        if (agg === "count") {
+          val = filteredRows.length;
+        } else if (agg === "sum") {
+          val = filteredRows.reduce((acc, row) => acc + (+row[field] || 0), 0);
+        } else if (agg === "avg") {
+          val = filteredRows.length
+            ? filteredRows.reduce((acc, row) => acc + (+row[field] || 0), 0) /
+              filteredRows.length
+            : 0;
+        } else if (agg === "min") {
+          val = filteredRows.length
+            ? Math.min(...filteredRows.map((row) => +row[field] || Infinity))
+            : "";
+          if (val === Infinity) val = "";
+        } else if (agg === "max") {
+          val = filteredRows.length
+            ? Math.max(...filteredRows.map((row) => +row[field] || -Infinity))
+            : "";
+          if (val === -Infinity) val = "";
+        }
+
+        rowObj[colKey] = val;
+      }
+      table.push(rowObj);
+    }
+  } else if (rows.length > 0 && data.length > 0) {
+    // Handle no data but rows present - show empty groups
     const uniqVals = rows.map((r) =>
       Array.from(new Set(data.map((d) => d[r] ?? "N/A")))
     );
     let combos: string[][] = uniqVals.length
       ? uniqVals[0].map((v) => [v])
       : [[]];
-    for (let i = 1; i < uniqVals.length; ++i)
+    for (let i = 1; i < uniqVals.length; i++)
       combos = combos.flatMap((arr) => uniqVals[i].map((v) => [...arr, v]));
-    emptyRowCombos = combos.map((arr) => arr.join("|||"));
+    combos.forEach((combo) => {
+      const rowObj: Record<string, any> = {};
+      rows.forEach((r, idx) => (rowObj[r] = combo[idx]));
+      colKeys.forEach((colKey) => {
+        rowObj[colKey] = "";
+      });
+      table.push(rowObj);
+    });
   }
 
-  const table = (allRowKeys.length ? allRowKeys : emptyRowCombos).map(
-    (rowKey) => {
-      const rowVals = rowKey.split("|||");
-      const rec: Record<string, any> = {};
-      rows.forEach((r, i) => (rec[r] = rowVals[i]));
-      allColKeys.forEach((colKey) => {
-        const groupMap = dataMap.get(rowKey) ?? new Map();
-        const groupRows = groupMap.get(colKey) ?? [];
-        const last = colKey.split("|||").pop()!;
-        const match = last.match(/(.+)\((sum|avg|min|max|count)\)$/);
-        let field = "",
-          agg = "";
-        if (match) {
-          field = match[1];
-          agg = match[2];
-        }
-        let val: any = "";
-        if (agg === "count") val = groupRows.length;
-        else if (agg === "sum")
-          val = groupRows.reduce((a: any, r: any) => a + (+r[field] || 0), 0);
-        else if (agg === "avg")
-          val = groupRows.length
-            ? groupRows.reduce((a: any, r: any) => a + (+r[field] || 0), 0) /
-              groupRows.length
-            : 0;
-        else if (agg === "min")
-          val = groupRows.length
-            ? Math.min(...groupRows.map((r: any) => +r[field] || 0))
-            : "";
-        else if (agg === "max")
-          val = groupRows.length
-            ? Math.max(...groupRows.map((r: any) => +r[field] || 0))
-            : "";
-        rec[colKey] = val;
-      });
-      return rec;
-    }
-  );
-
+  // Set default widths
   const widths: Record<string, number> = {};
-  allColKeys.forEach((k) => (widths[k] = 150));
+  colKeys.forEach((k) => (widths[k] = 150));
+
   return {
     table,
     rowGroups: rows,
     colGroups: cols,
-    valueCols: allColKeys,
+    valueCols: colKeys,
     widths,
   };
 }
