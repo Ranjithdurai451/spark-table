@@ -56,10 +56,9 @@ export const SidebarControls = ({
     removeFromZone,
     numericFields,
     getZoneOfField,
-    clearZone, // Add this function to pivot-store (should clear a whole zone)
+    clearZone,
   } = usePivotStore();
 
-  // Configure sensors with proper activation constraints
   const sensors = useSensors(
     useSensor(PointerSensor, {
       activationConstraint: {
@@ -86,7 +85,6 @@ export const SidebarControls = ({
     const { zone: sourceZone, field } = parseDragId(active.id as string);
     const targetZone = over.id as "rows" | "columns" | "values" | "data-panel";
 
-    // Handle dropping back to data panel (unchecking)
     if (targetZone === "data-panel") {
       const existingZone = getZoneOfField(field);
       if (existingZone) {
@@ -95,21 +93,17 @@ export const SidebarControls = ({
       return;
     }
 
-    // Validate numeric fields for values zone
     if (targetZone === "values" && !numericFields.includes(field)) {
       return;
     }
 
-    // Don't do anything if dropping in the same zone
     if (sourceZone === targetZone) {
       return;
     }
 
-    // Handle drag from data panel
     if (sourceZone === "data") {
       const existingZone = getZoneOfField(field);
       if (existingZone) {
-        // Move from existing zone to target zone
         if (existingZone !== targetZone) {
           moveBetweenZones(
             existingZone as "rows" | "columns" | "values",
@@ -118,11 +112,9 @@ export const SidebarControls = ({
           );
         }
       } else {
-        // Add new field to target zone
         addToZone(targetZone as "rows" | "columns" | "values", field);
       }
     } else {
-      // Moving between zones
       moveBetweenZones(
         sourceZone as "rows" | "columns" | "values",
         targetZone as "rows" | "columns" | "values",
@@ -145,11 +137,13 @@ export const SidebarControls = ({
       onDragCancel={handleDragCancel}
     >
       <aside
-        className={cn("h-full border-l bg-background relative flex", className)}
+        className={cn(
+          "h-full border-l bg-background relative flex transition-all duration-300 ease-in-out",
+          className
+        )}
         style={{ width }}
         aria-label="Sidebar controls"
       >
-        {/* Panels */}
         <div className="flex flex-1 min-w-0">
           {open.viz && (
             <PanelShell
@@ -192,7 +186,6 @@ export const SidebarControls = ({
           )}
         </div>
 
-        {/* Rail */}
         <div
           className="h-full border-l bg-muted/40 flex-shrink-0"
           style={{ width: railW }}
@@ -214,7 +207,6 @@ export const SidebarControls = ({
         </div>
       </aside>
 
-      {/* Drag Overlay - No duplicate shadow */}
       <DragOverlay dropAnimation={{ duration: 200, easing: "ease" }}>
         {activeField ? (
           <div className="flex items-center gap-1.5 rounded border bg-background px-2.5 py-1.5 text-xs shadow-lg border-primary/50">
@@ -243,7 +235,7 @@ function PanelShell({
   return (
     <div
       className={cn(
-        "h-full bg-background flex flex-col overflow-hidden",
+        "h-full bg-background flex flex-col overflow-hidden transition-all duration-300 ease-in-out",
         showRightBorder && "border-r"
       )}
       style={{ width }}
@@ -279,7 +271,7 @@ function RailTab({
   return (
     <button
       className={cn(
-        "flex py-4 w-9 items-center justify-center rounded border transition-colors",
+        "flex py-4 w-9 items-center justify-center rounded border transition-all duration-200 ease-in-out",
         active
           ? "bg-primary/75 border-input"
           : "bg-background border-border hover:bg-muted/50"
@@ -291,7 +283,7 @@ function RailTab({
       <div className="flex flex-col items-center gap-5">
         <div
           className={cn(
-            "transition-colors",
+            "transition-colors duration-200",
             active ? "text-secondary" : "text-muted-foreground"
           )}
         >
@@ -299,7 +291,7 @@ function RailTab({
         </div>
         <span
           className={cn(
-            "text-sm whitespace-nowrap transition-colors",
+            "text-sm whitespace-nowrap transition-colors duration-200",
             active ? "text-secondary" : "text-muted-foreground"
           )}
           style={{ writingMode: "vertical-rl", transform: "rotate(180deg)" }}
@@ -328,7 +320,6 @@ function DataPanel({ fields }: { fields: string[] }) {
     [fields, q]
   );
 
-  // Make data panel droppable
   const { setNodeRef: setDropRef, isOver } = useDroppable({
     id: "data-panel",
   });
@@ -422,7 +413,6 @@ function DataFieldItem({
     transform: transform
       ? `translate3d(${transform.x}px, ${transform.y}px, 0)`
       : undefined,
-    // KEY FIX: Hide original element completely during drag to prevent duplicate shadow
     opacity: isDragging ? 0 : 1,
   };
 
@@ -436,7 +426,6 @@ function DataFieldItem({
         isActive && "border-input bg-muted/30"
       )}
     >
-      {/* Drag Handle */}
       <div
         {...listeners}
         {...attributes}
@@ -452,7 +441,6 @@ function DataFieldItem({
         {isNumeric ? "num" : "text"}
       </span>
 
-      {/* Checkbox */}
       <input
         type="checkbox"
         className="h-3 w-3 rounded border-input cursor-pointer flex-shrink-0"
@@ -491,7 +479,6 @@ function DraggableFieldPill({
     transform: transform
       ? `translate3d(${transform.x}px, ${transform.y}px, 0)`
       : undefined,
-    // KEY FIX: Hide original element completely during drag
     opacity: isDragging ? 0 : 1,
   };
 
@@ -501,7 +488,6 @@ function DraggableFieldPill({
       style={style}
       className="group flex items-center gap-1 rounded border bg-background px-2 py-1 text-xs"
     >
-      {/* Drag Handle */}
       <button
         ref={setActivatorNodeRef}
         {...listeners}
@@ -528,7 +514,6 @@ function DraggableFieldPill({
   );
 }
 
-// Drop zone component with clear button
 function DropZoneArea({
   id,
   title,
@@ -595,7 +580,6 @@ function DropZoneArea({
   );
 }
 
-// Values zone with clear and aggregation
 function ValuesZoneArea({
   items,
   onClear,
@@ -671,7 +655,6 @@ function ValueFieldItem({ value }: { value: { field: string; agg: string } }) {
     transform: transform
       ? `translate3d(${transform.x}px, ${transform.y}px, 0)`
       : undefined,
-    // KEY FIX: Hide original element completely during drag
     opacity: isDragging ? 0 : 1,
   };
 
@@ -681,7 +664,6 @@ function ValueFieldItem({ value }: { value: { field: string; agg: string } }) {
       style={style}
       className="group flex items-center gap-2 rounded border bg-background px-2 py-1.5"
     >
-      {/* Drag Handle */}
       <button
         ref={setActivatorNodeRef}
         {...listeners}
@@ -693,7 +675,6 @@ function ValueFieldItem({ value }: { value: { field: string; agg: string } }) {
         <GripVertical className="h-3 w-3 text-muted-foreground flex-shrink-0" />
       </button>
       <span className="text-xs flex-1 truncate select-none">{value.field}</span>
-      {/* Select - NOT draggable */}
       <select
         className="text-xs h-6 bg-background border border-input rounded px-1.5 cursor-pointer hover:bg-muted/50 transition-colors"
         value={value.agg}
