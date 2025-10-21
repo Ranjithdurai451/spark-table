@@ -265,7 +265,7 @@ export function aggregateData(
   const rowKeys = Object.keys(rowDataMap);
   for (let r = 0; r < rowKeys.length; r++) {
     const rowKey = rowKeys[r];
-    const rowsGroup = rowDataMap[rowKey];
+    // const rowsGroup = rowDataMap[rowKey];
     const rowObj: Record<string, any> = {}; // Set row group values
     if (rowsLen > 0) {
       const rowKeyParts = rowKey.split("|||");
