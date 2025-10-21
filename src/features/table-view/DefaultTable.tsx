@@ -47,7 +47,7 @@ export const DefaultTable = () => {
                 {headerGroup.headers.map((header) => (
                   <th
                     key={header.id}
-                    className="px-3 py-2 text-left border-b border-r border-border bg-muted font-semibold text-xs uppercase tracking-wide last:border-r-0"
+                    className="px-3 py-2 text-left border-b border-r border-border  bg-muted font-semibold text-xs uppercase tracking-wide last:border-r-0"
                     style={{
                       whiteSpace: "nowrap",
                       letterSpacing: "0.01em",
