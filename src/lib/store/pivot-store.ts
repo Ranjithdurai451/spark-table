@@ -16,6 +16,13 @@ export type PivotState = {
   fileName?: string;
   showRaw: boolean;
 
+  // State history for undo functionality
+  previousState: {
+    rows: string[];
+    columns: string[];
+    values: ValueItem[];
+  } | null;
+
   setData: (rows: any[], fileName?: string) => void;
   clearData: () => void;
 
@@ -34,6 +41,10 @@ export type PivotState = {
   removeValueField: (field: string) => void;
 
   setShowRaw: (v: boolean) => void;
+
+  // State management methods
+  saveStateSnapshot: () => void;
+  revertToPreviousState: () => void;
 };
 
 function isLikelyDate(val: any): boolean {
@@ -64,6 +75,7 @@ function isLikelyDate(val: any): boolean {
   const year = date.getFullYear();
   return year >= 1900 && year <= 2100;
 }
+
 function inferFieldsMetadata(rows: any[]) {
   if (rows.length === 0) {
     return { numericFields: [], dateFields: [] };
@@ -133,6 +145,7 @@ export const usePivotStore = create<PivotState>((set, get) => ({
   values: [],
   fileName: undefined,
   showRaw: true,
+  previousState: null,
 
   setData(rows, fileName) {
     const fields = inferFields(rows);
@@ -148,6 +161,7 @@ export const usePivotStore = create<PivotState>((set, get) => ({
       rows: [],
       columns: [],
       values: [],
+      previousState: null,
     });
   },
 
@@ -162,11 +176,22 @@ export const usePivotStore = create<PivotState>((set, get) => ({
       values: [],
       fileName: undefined,
       showRaw: true,
+      previousState: null,
     });
   },
 
   addToZone(zone, field) {
     const s = get();
+
+    // Save current state before making changes
+    set({
+      previousState: {
+        rows: [...s.rows],
+        columns: [...s.columns],
+        values: [...s.values],
+      },
+    });
+
     const cleanedRows = s.rows.filter((f) => f !== field);
     const cleanedCols = s.columns.filter((f) => f !== field);
     const cleanedValues = s.values.filter((v) => v.field !== field);
@@ -218,6 +243,16 @@ export const usePivotStore = create<PivotState>((set, get) => ({
   moveBetweenZones(from, to, field) {
     if (from === to) return;
     const s = get();
+
+    // Save state before moving
+    set({
+      previousState: {
+        rows: [...s.rows],
+        columns: [...s.columns],
+        values: [...s.values],
+      },
+    });
+
     if (from === "values") {
       set({ values: s.values.filter((v) => v.field !== field) });
     } else {
@@ -255,5 +290,32 @@ export const usePivotStore = create<PivotState>((set, get) => ({
 
   setShowRaw(v) {
     set({ showRaw: v });
+  },
+
+  saveStateSnapshot() {
+    const s = get();
+    set({
+      previousState: {
+        rows: [...s.rows],
+        columns: [...s.columns],
+        values: [...s.values],
+      },
+    });
+  },
+
+  revertToPreviousState() {
+    const s = get();
+    if (s.previousState) {
+      const { rows, columns, values } = s.previousState;
+      const isAllEmpty =
+        rows.length === 0 && columns.length === 0 && values.length === 0;
+      set({
+        rows,
+        columns,
+        values,
+        previousState: null,
+        showRaw: isAllEmpty ? true : false,
+      });
+    }
   },
 }));
