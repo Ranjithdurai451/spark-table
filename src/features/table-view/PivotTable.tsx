@@ -29,7 +29,6 @@ export const PivotTable = () => {
   const [page, setPage] = useState(1);
   const pageSize = 32;
 
-  // Compute pivot table
   useEffect(() => {
     if (showRaw || (!rows.length && !columns.length && !values.length)) {
       setComputationState({ status: "idle", data: null });
@@ -42,7 +41,7 @@ export const PivotTable = () => {
       try {
         const result = aggregateData(data, rows, columns, values);
         setComputationState({ status: "ready", data: result });
-        setPage(1); // Reset to first page on new computation
+        setPage(1);
       } catch (error) {
         setComputationState({
           status: "error",
@@ -77,7 +76,6 @@ export const PivotTable = () => {
     return buildColHeaderTree(valueCols, colGroups);
   }, [valueCols, colGroups, computationState.status]);
 
-  // Loading state
   if (computationState.status === "computing") {
     return (
       <div className="w-full h-full flex flex-col rounded-lg overflow-hidden bg-background border border-border">
@@ -93,7 +91,6 @@ export const PivotTable = () => {
     );
   }
 
-  // Error state
   if (computationState.status === "error") {
     return (
       <div className="w-full h-full flex flex-col rounded-lg overflow-hidden bg-background border border-border">
@@ -106,7 +103,6 @@ export const PivotTable = () => {
     );
   }
 
-  // Empty state
   if (showRaw || (!visibleData.length && !leafCols.length)) return null;
   console.log("Rendering PivotTable with", {
     rowGroups,
@@ -119,13 +115,11 @@ export const PivotTable = () => {
   console.log("Leaf Columns:", leafCols);
   return (
     <div className="w-full h-full flex flex-col rounded-lg overflow-hidden bg-background border border-border">
-      {/* Scrollable container */}
       <div className="flex-1 min-h-0 overflow-auto scrollbar-thin">
         <table className="w-full border-collapse">
           <thead className="sticky top-0 z-10 bg-muted">
             {headerRows.map((headerRow, lvl) => (
               <tr key={`header-row-${lvl}`}>
-                {/* Row Group Headers - only render on first header row */}
                 {lvl === 0 &&
                   rowGroups.map((groupName, groupIndex) => (
                     <th
@@ -137,7 +131,6 @@ export const PivotTable = () => {
                     </th>
                   ))}
 
-                {/* Data Column Headers */}
                 {headerRow.map((cell, cellIndex) => (
                   <th
                     key={`header-${lvl}-${cellIndex}`}
@@ -163,7 +156,6 @@ export const PivotTable = () => {
                       : "hsl(var(--muted) / 0.3)",
                 }}
               >
-                {/* Row Group Cells */}
                 {rowGroups.map((col, groupIndex) => {
                   const span = rowSpans[rowIndex]?.[groupIndex];
                   if (span === 0) return null;
@@ -185,7 +177,6 @@ export const PivotTable = () => {
                   );
                 })}
 
-                {/* Data Cells */}
                 {leafCols.map((col, colIndex) => {
                   const value = row[col];
                   const isNum = typeof value === "number";
@@ -195,13 +186,13 @@ export const PivotTable = () => {
                   return (
                     <td
                       key={`cell-${rowIndex}-data-${colIndex}`}
-                      className={`px-3 py-2 text-xs transition-colors border-r border-b border-border min-w-[150px] text-center
-                    
-                      `}
+                      className={`px-3 py-2 text-xs transition-colors border-r border-b border-border min-w-[150px] ${
+                        isNum ? "text-right font-mono" : "text-center"
+                      }`}
                     >
                       <span className="truncate block">
                         {isEmpty
-                          ? "-"
+                          ? "—"
                           : isNum
                           ? value.toLocaleString(undefined, {
                               maximumFractionDigits: 2,

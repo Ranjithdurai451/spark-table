@@ -36,19 +36,15 @@ export type PivotState = {
   setShowRaw: (v: boolean) => void;
 };
 
-// Stricter date validation for CSV data
 function isLikelyDate(val: any): boolean {
   if (val === null || val === undefined || val === "") return false;
 
   const str = String(val).trim();
 
-  // Reject pure numbers (Excel date codes, IDs, etc.)
   if (/^\d+$/.test(str)) return false;
 
-  // Reject if too short (less than 8 chars like "1/1/2020")
   if (str.length < 6) return false;
 
-  // Only accept common date formats
   const commonDateFormats = [
     /^\d{4}-\d{2}-\d{2}/, // YYYY-MM-DD
     /^\d{4}\/\d{2}\/\d{2}/, // YYYY/MM/DD
@@ -61,17 +57,13 @@ function isLikelyDate(val: any): boolean {
   const matchesFormat = commonDateFormats.some((regex) => regex.test(str));
   if (!matchesFormat) return false;
 
-  // Additional validation: must parse to valid date
   const parsed = Date.parse(str);
   if (isNaN(parsed)) return false;
 
-  // Sanity check: date should be between 1900 and 2100
   const date = new Date(parsed);
   const year = date.getFullYear();
   return year >= 1900 && year <= 2100;
 }
-
-// Single-pass field inference with metadata (no groups collection)
 function inferFieldsMetadata(rows: any[]) {
   if (rows.length === 0) {
     return { numericFields: [], dateFields: [] };
@@ -117,13 +109,11 @@ function inferFieldsMetadata(rows: any[]) {
   return { numericFields, dateFields };
 }
 
-// Infer fields from first row keys
 function inferFields(rows: any[]): string[] {
   if (rows.length === 0) return [];
   return Object.keys(rows[0]);
 }
 
-// Deduplicate value fields by field name
 function dedupeVals(arr: ValueItem[]): ValueItem[] {
   const seen = new Set<string>();
   return arr.filter((v) => {
