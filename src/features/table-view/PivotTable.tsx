@@ -1,4 +1,4 @@
-import { useMemo, useState, useEffect } from "react";
+import { useMemo, useState, useEffect, memo } from "react";
 import { usePivotStore } from "@/lib/store/pivot-store";
 import { Pagination } from "./Pagination";
 import {
@@ -14,6 +14,98 @@ interface ComputationState {
   error?: string;
 }
 
+// Memoized Row Component for performance
+const TableRow = memo(
+  ({
+    row,
+    rowIndex,
+    rowGroups,
+    rowSpans,
+    leafCols,
+  }: {
+    row: any;
+    rowIndex: number;
+    rowGroups: string[];
+    rowSpans: Record<number, any[]>;
+    leafCols: string[];
+  }) => {
+    const isSubtotal = row.__isSubtotal || false;
+    const subtotalLevel = row.__subtotalLevel ?? -1;
+
+    return (
+      <tr
+        className={`group transition-colors ${
+          isSubtotal ? "bg-muted/50" : "bg-background"
+        } `}
+      >
+        {rowGroups.map((col, groupIndex) => {
+          const spanInfo = rowSpans[rowIndex]?.[groupIndex];
+
+          if (!spanInfo || spanInfo.span === 0) return null;
+
+          if (isSubtotal && groupIndex > subtotalLevel) {
+            return null;
+          }
+
+          let colSpan = 1;
+          if (isSubtotal) {
+            colSpan = rowGroups.length - groupIndex;
+          }
+
+          const cellValue = row[col];
+          const displayValue =
+            cellValue !== undefined && cellValue !== null && cellValue !== ""
+              ? String(cellValue)
+              : "—";
+
+          return (
+            <td
+              key={`row-${rowIndex}-group-${groupIndex}`}
+              rowSpan={spanInfo.span || 1}
+              colSpan={colSpan}
+              className={`px-3 py-2 text-xs border-r border-b border-border min-w-[200px] max-w-[200px] ${
+                isSubtotal
+                  ? "font-semibold text-foreground text-left"
+                  : "font-medium text-center"
+              }`}
+            >
+              <span className="truncate block">{displayValue}</span>
+            </td>
+          );
+        })}
+
+        {leafCols.map((col, colIndex) => {
+          const value = row[col];
+          const isNum = typeof value === "number";
+          const isEmpty = value === undefined || value === null || value === "";
+
+          return (
+            <td
+              key={`cell-${rowIndex}-data-${colIndex}`}
+              className={`px-3 py-2 text-center text-xs transition-colors border-r border-b border-border min-w-[150px] ${
+                isNum ? " font-mono" : ""
+              } ${isSubtotal ? "font-semibold" : ""}`}
+            >
+              <span className="truncate block">
+                {isEmpty
+                  ? "-"
+                  : isNum
+                  ? value.toLocaleString(undefined, {
+                      maximumFractionDigits: 2,
+                      minimumFractionDigits: 0,
+                    })
+                  : String(value)}
+              </span>
+            </td>
+          );
+        })}
+      </tr>
+    );
+  }
+);
+
+TableRow.displayName = "TableRow";
+
 export const PivotTable = () => {
   const data = usePivotStore((state) => state.data);
   const rows = usePivotStore((state) => state.rows);
@@ -27,7 +119,7 @@ export const PivotTable = () => {
   });
 
   const [page, setPage] = useState(1);
-  const pageSize = 32;
+  const pageSize = 50;
 
   useEffect(() => {
     if (showRaw || (!rows.length && !columns.length && !values.length)) {
@@ -37,32 +129,43 @@ export const PivotTable = () => {
 
     setComputationState({ status: "computing", data: null });
 
-    const timeoutId = setTimeout(() => {
+    const computeData = () => {
       try {
         const result = aggregateData(data, rows, columns, values);
         setComputationState({ status: "ready", data: result });
         setPage(1);
       } catch (error) {
+        console.error("Aggregation error:", error);
         setComputationState({
           status: "error",
           data: null,
           error: error instanceof Error ? error.message : "Computation failed",
         });
       }
-    }, 100);
+    };
+
+    const timeoutId = setTimeout(computeData, 100);
 
     return () => clearTimeout(timeoutId);
   }, [data, rows, columns, values, showRaw]);
 
-  const { table, rowGroups, colGroups, valueCols } = computationState.data || {
-    table: [],
-    rowGroups: [],
-    colGroups: [],
-    valueCols: [],
-  };
+  const { table, grandTotal, rowGroups, colGroups, valueCols } = useMemo(
+    () =>
+      computationState.data || {
+        table: [],
+        grandTotal: null,
+        rowGroups: [],
+        colGroups: [],
+        valueCols: [],
+      },
+    [computationState.data]
+  );
 
   const startIdx = (page - 1) * pageSize;
-  const visibleData = table.slice(startIdx, startIdx + pageSize);
+  const visibleData = useMemo(
+    () => table.slice(startIdx, startIdx + pageSize),
+    [table, startIdx, pageSize]
+  );
 
   const rowSpans = useMemo(() => {
     if (computationState.status !== "ready" || !visibleData.length) return {};
@@ -104,19 +207,16 @@ export const PivotTable = () => {
   }
 
   if (showRaw || (!visibleData.length && !leafCols.length)) return null;
-  console.log("Rendering PivotTable with", {
-    rowGroups,
-    colGroups,
-    valueCols,
-    table,
-  });
-  console.log("Row Spans:", rowSpans);
-  console.log("Header Rows:", headerRows);
-  console.log("Leaf Columns:", leafCols);
+
+  const hasGrandTotal = grandTotal !== null;
+
   return (
     <div className="w-full h-full flex flex-col rounded-lg overflow-hidden bg-background border border-border">
       <div className="flex-1 min-h-0 overflow-auto scrollbar-thin">
-        <table className="w-full border-collapse">
+        <table
+          className="w-full"
+          style={{ borderCollapse: "separate", borderSpacing: 0 }}
+        >
           <thead className="sticky top-0 z-10 bg-muted">
             {headerRows.map((headerRow, lvl) => (
               <tr key={`header-row-${lvl}`}>
@@ -125,7 +225,7 @@ export const PivotTable = () => {
                     <th
                       key={`header-rowgroup-${groupIndex}`}
                       rowSpan={headerRows.length}
-                      className="px-3 py-2 text-xs font-semibold bg-muted text-muted-foreground border-r border-b border-border min-w-[200px] max-w-[200px]"
+                      className="px-3 py-2 text-xs font-semibold bg-muted text-muted-foreground border-r border-b border-border min-w-[200px] max-w-[200px] uppercase"
                     >
                       <span className="truncate block">{groupName}</span>
                     </th>
@@ -135,7 +235,7 @@ export const PivotTable = () => {
                   <th
                     key={`header-${lvl}-${cellIndex}`}
                     colSpan={cell.colSpan}
-                    className="px-3 py-2 text-xs font-semibold bg-muted text-muted-foreground border-r border-b border-border min-w-[150px]"
+                    className="px-3 py-2 text-xs font-semibold bg-muted text-muted-foreground border-r border-b border-border min-w-[150px] uppercase"
                   >
                     <span className="truncate block">{cell.label}</span>
                   </th>
@@ -146,48 +246,48 @@ export const PivotTable = () => {
 
           <tbody>
             {visibleData.map((row, rowIndex) => (
-              <tr
-                key={`row-${rowIndex}`}
-                className="group hover:bg-accent/20 transition-colors"
-                style={{
-                  backgroundColor:
-                    rowIndex % 2 === 0
-                      ? "hsl(var(--background))"
-                      : "hsl(var(--muted) / 0.3)",
-                }}
-              >
+              <TableRow
+                key={`row-${startIdx + rowIndex}`}
+                row={row}
+                rowIndex={rowIndex}
+                rowGroups={rowGroups}
+                rowSpans={rowSpans}
+                leafCols={leafCols}
+              />
+            ))}
+          </tbody>
+
+          {/* Grand Total Footer - Sticky at bottom */}
+          {hasGrandTotal && (
+            <tfoot className="sticky bottom-0 z-10 bg-muted/80 backdrop-blur-sm">
+              <tr className="border-t-2 border-border">
                 {rowGroups.map((col, groupIndex) => {
-                  const span = rowSpans[rowIndex]?.[groupIndex];
-                  if (span === 0) return null;
+                  if (groupIndex > 0) return null;
+
+                  const displayValue = grandTotal[col] || "Grand Total";
 
                   return (
                     <td
-                      key={`row-${rowIndex}-group-${groupIndex}`}
-                      rowSpan={span || 1}
-                      className="px-3 py-2 text-xs font-medium text-center border-r border-b border-border min-w-[200px] max-w-[200px]"
+                      key={`grandtotal-group-${groupIndex}`}
+                      colSpan={rowGroups.length}
+                      className="px-3 py-2.5 text-xs font-bold text-foreground border-r border-b border-border min-w-[200px] text-left"
                     >
-                      <span className="truncate block">
-                        {row[col] !== undefined &&
-                        row[col] !== null &&
-                        row[col] !== ""
-                          ? String(row[col])
-                          : "—"}
-                      </span>
+                      <span className="truncate block">{displayValue}</span>
                     </td>
                   );
                 })}
 
                 {leafCols.map((col, colIndex) => {
-                  const value = row[col];
+                  const value = grandTotal[col];
                   const isNum = typeof value === "number";
                   const isEmpty =
                     value === undefined || value === null || value === "";
 
                   return (
                     <td
-                      key={`cell-${rowIndex}-data-${colIndex}`}
-                      className={`px-3 py-2 text-xs transition-colors border-r border-b border-border min-w-[150px] ${
-                        isNum ? "text-right font-mono" : "text-center"
+                      key={`grandtotal-data-${colIndex}`}
+                      className={`px-3 py-2.5 text-center text-xs font-bold border-r border-b border-border min-w-[150px] ${
+                        isNum ? " font-mono" : ""
                       }`}
                     >
                       <span className="truncate block">
@@ -196,6 +296,7 @@ export const PivotTable = () => {
                           : isNum
                           ? value.toLocaleString(undefined, {
                               maximumFractionDigits: 2,
+                              minimumFractionDigits: 0,
                             })
                           : String(value)}
                       </span>
@@ -203,8 +304,8 @@ export const PivotTable = () => {
                   );
                 })}
               </tr>
-            ))}
-          </tbody>
+            </tfoot>
+          )}
         </table>
       </div>
 
