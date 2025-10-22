@@ -1,5 +1,4 @@
-// PivotTable.tsx
-import React, { useMemo, useState, useEffect } from "react";
+import { useMemo, useState, useEffect } from "react";
 import { usePivotStore } from "@/lib/store/pivot-store";
 import { Pagination } from "./Pagination";
 import {
@@ -15,7 +14,7 @@ interface ComputationState {
   error?: string;
 }
 
-export const PivotTable: React.FC = () => {
+export const PivotTable = () => {
   const data = usePivotStore((state) => state.data);
   const rows = usePivotStore((state) => state.rows);
   const columns = usePivotStore((state) => state.columns);
@@ -30,6 +29,7 @@ export const PivotTable: React.FC = () => {
   const [page, setPage] = useState(1);
   const pageSize = 32;
 
+  // Compute pivot table
   useEffect(() => {
     if (showRaw || (!rows.length && !columns.length && !values.length)) {
       setComputationState({ status: "idle", data: null });
@@ -42,6 +42,7 @@ export const PivotTable: React.FC = () => {
       try {
         const result = aggregateData(data, rows, columns, values);
         setComputationState({ status: "ready", data: result });
+        setPage(1); // Reset to first page on new computation
       } catch (error) {
         setComputationState({
           status: "error",
@@ -76,7 +77,7 @@ export const PivotTable: React.FC = () => {
     return buildColHeaderTree(valueCols, colGroups);
   }, [valueCols, colGroups, computationState.status]);
 
-  // Show loading state
+  // Loading state
   if (computationState.status === "computing") {
     return (
       <div className="w-full h-full flex flex-col rounded-lg overflow-hidden bg-background border border-border">
@@ -92,6 +93,7 @@ export const PivotTable: React.FC = () => {
     );
   }
 
+  // Error state
   if (computationState.status === "error") {
     return (
       <div className="w-full h-full flex flex-col rounded-lg overflow-hidden bg-background border border-border">
@@ -104,8 +106,17 @@ export const PivotTable: React.FC = () => {
     );
   }
 
+  // Empty state
   if (showRaw || (!visibleData.length && !leafCols.length)) return null;
-
+  console.log("Rendering PivotTable with", {
+    rowGroups,
+    colGroups,
+    valueCols,
+    table,
+  });
+  console.log("Row Spans:", rowSpans);
+  console.log("Header Rows:", headerRows);
+  console.log("Leaf Columns:", leafCols);
   return (
     <div className="w-full h-full flex flex-col rounded-lg overflow-hidden bg-background border border-border">
       {/* Scrollable container */}
@@ -114,7 +125,7 @@ export const PivotTable: React.FC = () => {
           <thead className="sticky top-0 z-10 bg-muted">
             {headerRows.map((headerRow, lvl) => (
               <tr key={`header-row-${lvl}`}>
-                {/* Row Group Headers */}
+                {/* Row Group Headers - only render on first header row */}
                 {lvl === 0 &&
                   rowGroups.map((groupName, groupIndex) => (
                     <th
@@ -127,29 +138,15 @@ export const PivotTable: React.FC = () => {
                   ))}
 
                 {/* Data Column Headers */}
-                {headerRow.map((cell, cellIndex) => {
-                  // Skip cells that are part of a previous colspan
-                  if (cellIndex > 0) {
-                    const prevCell = headerRow[cellIndex - 1];
-                    if (
-                      prevCell &&
-                      prevCell.colSpan > 1 &&
-                      prevCell.label === cell.label
-                    ) {
-                      return null;
-                    }
-                  }
-
-                  return (
-                    <th
-                      key={`header-${lvl}-${cellIndex}`}
-                      colSpan={cell.colSpan}
-                      className="px-3 py-2 text-xs font-semibold bg-muted text-muted-foreground border-r border-b border-border min-w-[150px]"
-                    >
-                      <span className="truncate block">{cell.label}</span>
-                    </th>
-                  );
-                })}
+                {headerRow.map((cell, cellIndex) => (
+                  <th
+                    key={`header-${lvl}-${cellIndex}`}
+                    colSpan={cell.colSpan}
+                    className="px-3 py-2 text-xs font-semibold bg-muted text-muted-foreground border-r border-b border-border min-w-[150px]"
+                  >
+                    <span className="truncate block">{cell.label}</span>
+                  </th>
+                ))}
               </tr>
             ))}
           </thead>
@@ -198,13 +195,13 @@ export const PivotTable: React.FC = () => {
                   return (
                     <td
                       key={`cell-${rowIndex}-data-${colIndex}`}
-                      className={`px-3 py-2 text-xs transition-colors border-r border-b border-border min-w-[150px] ${
-                        isNum ? "text-right font-mono" : "text-center"
-                      }`}
+                      className={`px-3 py-2 text-xs transition-colors border-r border-b border-border min-w-[150px] text-center
+                    
+                      `}
                     >
                       <span className="truncate block">
                         {isEmpty
-                          ? "—"
+                          ? "-"
                           : isNum
                           ? value.toLocaleString(undefined, {
                               maximumFractionDigits: 2,
@@ -221,14 +218,16 @@ export const PivotTable: React.FC = () => {
       </div>
 
       {/* Pagination */}
-      <div style={{ borderTop: "1px solid hsl(var(--border))" }}>
-        <Pagination
-          page={page}
-          pageSize={pageSize}
-          total={table.length}
-          setPage={setPage}
-        />
-      </div>
+      {table.length > pageSize && (
+        <div style={{ borderTop: "1px solid hsl(var(--border))" }}>
+          <Pagination
+            page={page}
+            pageSize={pageSize}
+            total={table.length}
+            setPage={setPage}
+          />
+        </div>
+      )}
     </div>
   );
 };
