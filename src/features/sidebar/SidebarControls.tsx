@@ -22,6 +22,7 @@ import {
   type DragEndEvent,
 } from "@dnd-kit/core";
 import { useDraggable, useDroppable } from "@dnd-kit/core";
+import { Checkbox } from "@/components/ui/checkbox";
 
 const createDragId = (zone: string, field: string) => `${zone}:${field}`;
 const parseDragId = (id: string) => {
@@ -337,12 +338,7 @@ function DataPanel({ fields }: { fields: string[] }) {
   return (
     <div className="flex h-full flex-col gap-3">
       <label className="flex items-center gap-2 text-sm cursor-pointer">
-        <input
-          type="checkbox"
-          className="h-3.5 w-3.5 rounded border-input"
-          checked={showRaw}
-          onChange={(e) => setShowRaw(e.target.checked)}
-        />
+        <Checkbox checked={showRaw} onCheckedChange={setShowRaw} />
         <span className="text-muted-foreground">Show full table</span>
       </label>
 
@@ -441,11 +437,9 @@ function DataFieldItem({
         {isNumeric ? "num" : "text"}
       </span>
 
-      <input
-        type="checkbox"
-        className="h-3 w-3 rounded border-input cursor-pointer flex-shrink-0"
+      <Checkbox
         checked={isActive}
-        onChange={onToggle}
+        onCheckedChange={onToggle}
         onClick={(e) => e.stopPropagation()}
         aria-label={`Toggle ${field}`}
       />
