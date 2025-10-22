@@ -24,7 +24,6 @@ interface ComputationState {
   };
 }
 
-// Memoized Row Component for performance
 const TableRow = memo(
   ({
     row,
@@ -157,7 +156,6 @@ export const PivotTable = () => {
 
     lastConfigRef.current = configKey;
 
-    // Estimate only column count (rows are paginated)
     const pivotEstimation = estimatePivotSize(data, columns, values);
     setEstimation(pivotEstimation);
 
@@ -186,7 +184,7 @@ export const PivotTable = () => {
           // Apply column limiting if user proceeded with warning
           if (limitColumns && estimation && estimation.shouldWarn) {
             const { limitedData, columnsLimited, originalColumns } =
-              limitColumnsForRendering(data, columns, 500);
+              limitColumnsForRendering(data, columns, 200);
 
             dataToProcess = limitedData;
 
@@ -226,7 +224,6 @@ export const PivotTable = () => {
   );
 
   const handleWarningProceed = useCallback(() => {
-    // Proceed with column limiting
     performComputation(true);
   }, [performComputation]);
 
@@ -234,10 +231,8 @@ export const PivotTable = () => {
     setShowWarningDialog(false);
     setComputationState({ status: "idle", data: null });
 
-    // Revert to previous state (remove the field that caused the warning)
     revertToPreviousState();
 
-    // Reset the config ref
     lastConfigRef.current = "";
   }, [revertToPreviousState]);
 
@@ -271,7 +266,6 @@ export const PivotTable = () => {
     return buildColHeaderTree(valueCols, colGroups);
   }, [valueCols, colGroups, computationState.status]);
 
-  // Render warning state
   if (computationState.status === "awaiting-approval") {
     return (
       <>

@@ -34,7 +34,7 @@ export interface PivotEstimation {
   shouldWarn: boolean;
 }
 
-const COLUMN_WARNING_THRESHOLD = 500;
+const COLUMN_WARNING_THRESHOLD = 200;
 
 export function estimatePivotSize(
   data: any[],
@@ -52,7 +52,6 @@ export function estimatePivotSize(
     ? values
     : [{ field: "value", agg: "count" as const }];
 
-  // Calculate unique combinations for columns
   let uniqueColCombos = 1;
   if (cols.length > 0) {
     for (const colField of cols) {
@@ -78,7 +77,7 @@ export function estimatePivotSize(
 export function limitColumnsForRendering(
   data: any[],
   cols: string[],
-  maxColumns: number = 500
+  maxColumns: number = 200
 ): { limitedData: any[]; columnsLimited: boolean; originalColumns: number } {
   if (!cols.length) {
     return { limitedData: data, columnsLimited: false, originalColumns: 0 };
