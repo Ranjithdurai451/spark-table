@@ -306,11 +306,15 @@ export const usePivotStore = create<PivotState>((set, get) => ({
   revertToPreviousState() {
     const s = get();
     if (s.previousState) {
+      const { rows, columns, values } = s.previousState;
+      const isAllEmpty =
+        rows.length === 0 && columns.length === 0 && values.length === 0;
       set({
-        rows: s.previousState.rows,
-        columns: s.previousState.columns,
-        values: s.previousState.values,
+        rows,
+        columns,
+        values,
         previousState: null,
+        showRaw: isAllEmpty ? true : false,
       });
     }
   },
