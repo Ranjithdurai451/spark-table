@@ -29,10 +29,110 @@ export interface RowSpanInfo {
   level: number;
 }
 
-/**
- * Computes row spans with subtotal rows integrated
- * Optimized for performance with memoization-friendly structure
- */
+export interface PivotEstimation {
+  estimatedColumns: number;
+  shouldWarn: boolean;
+}
+
+const COLUMN_WARNING_THRESHOLD = 500;
+
+export function estimatePivotSize(
+  data: any[],
+  cols: string[],
+  values: AggregationValue[]
+): PivotEstimation {
+  if (!data.length) {
+    return {
+      estimatedColumns: 0,
+      shouldWarn: false,
+    };
+  }
+
+  const effectiveValues = values.length
+    ? values
+    : [{ field: "value", agg: "count" as const }];
+
+  // Calculate unique combinations for columns
+  let uniqueColCombos = 1;
+  if (cols.length > 0) {
+    for (const colField of cols) {
+      const uniqueValues = new Set();
+      for (const row of data) {
+        uniqueValues.add(row[colField] ?? "N/A");
+      }
+      uniqueColCombos *= uniqueValues.size;
+    }
+  }
+
+  const estimatedColumns =
+    cols.length > 0
+      ? uniqueColCombos * effectiveValues.length
+      : effectiveValues.length;
+
+  return {
+    estimatedColumns,
+    shouldWarn: estimatedColumns > COLUMN_WARNING_THRESHOLD,
+  };
+}
+
+export function limitColumnsForRendering(
+  data: any[],
+  cols: string[],
+  maxColumns: number = 500
+): { limitedData: any[]; columnsLimited: boolean; originalColumns: number } {
+  if (!cols.length) {
+    return { limitedData: data, columnsLimited: false, originalColumns: 0 };
+  }
+
+  // First, calculate how many unique column combinations we have
+  const colValues = new Map<string, Set<any>>();
+
+  for (const colField of cols) {
+    colValues.set(colField, new Set());
+    for (const row of data) {
+      colValues.get(colField)!.add(row[colField] ?? "N/A");
+    }
+  }
+
+  // Calculate total combinations
+  let totalCombos = 1;
+  colValues.forEach((values) => {
+    totalCombos *= values.size;
+  });
+
+  if (totalCombos <= maxColumns) {
+    return {
+      limitedData: data,
+      columnsLimited: false,
+      originalColumns: totalCombos,
+    };
+  }
+
+  // Limit the first column field to reduce combinations
+  const firstColField = cols[0];
+  const firstColValues = Array.from(colValues.get(firstColField)!);
+
+  // Calculate how many values we can keep
+  const maxValuesForFirstCol = Math.floor(
+    maxColumns / (totalCombos / firstColValues.length)
+  );
+  const limitedFirstColValues = firstColValues.slice(
+    0,
+    Math.max(10, maxValuesForFirstCol)
+  );
+
+  // Filter data to only include limited column values
+  const limitedData = data.filter((row) =>
+    limitedFirstColValues.includes(row[firstColField] ?? "N/A")
+  );
+
+  return {
+    limitedData,
+    columnsLimited: true,
+    originalColumns: totalCombos,
+  };
+}
+
 export function computeRowSpans(
   data: any[],
   groupFields: string[]
@@ -42,7 +142,6 @@ export function computeRowSpans(
   const spans: Record<number, RowSpanInfo[]> = {};
   const groupFieldsLen = groupFields.length;
 
-  // Initialize spans for all rows
   for (let i = 0; i < data.length; i++) {
     spans[i] = new Array(groupFieldsLen).fill(null).map(() => ({
       span: 0,
@@ -51,13 +150,11 @@ export function computeRowSpans(
     }));
   }
 
-  // Compute spans for each level
   for (let lvl = 0; lvl < groupFieldsLen; lvl++) {
     let i = 0;
     while (i < data.length) {
       const currentRow = data[i];
 
-      // Skip if this is a subtotal row and we're past its level
       if (currentRow.__isSubtotal && currentRow.__subtotalLevel < lvl) {
         i++;
         continue;
@@ -65,16 +162,13 @@ export function computeRowSpans(
 
       let j = i + 1;
 
-      // Find consecutive rows with matching group values
       while (j < data.length) {
         const nextRow = data[j];
 
-        // Stop if we hit a subtotal row at current or higher level
         if (nextRow.__isSubtotal && nextRow.__subtotalLevel <= lvl) {
           break;
         }
 
-        // Check if group values match
         let matches = true;
         for (let k = 0; k <= lvl; k++) {
           const currentVal = nextRow[groupFields[k]];
@@ -106,9 +200,6 @@ export function computeRowSpans(
   return spans;
 }
 
-/**
- * Builds column header tree structure
- */
 export function buildColHeaderTree(
   leafCols: string[],
   groupFields: string[]
@@ -219,10 +310,6 @@ export function buildColHeaderTree(
   };
 }
 
-/**
- * Aggregate values for a set of rows
- * Optimized for production use
- */
 function aggregateRows(rows: any[], field: string, agg: string): number | null {
   if (!rows.length) return null;
 
@@ -287,10 +374,6 @@ function aggregateRows(rows: any[], field: string, agg: string): number | null {
   }
 }
 
-/**
- * Insert subtotal rows into the table data
- * Production-optimized with proper memory management
- */
 function insertSubtotalRows(
   data: any[],
   rowGroups: string[],
@@ -312,7 +395,6 @@ function insertSubtotalRows(
       return;
     }
 
-    // Group by current level
     const groups = new Map<string, any[]>();
     for (const row of rows) {
       const key = String(row[rowGroups[level]] ?? "N/A");
@@ -322,29 +404,24 @@ function insertSubtotalRows(
       groups.get(key)!.push(row);
     }
 
-    // Process each group
     groups.forEach((groupRows, groupKey) => {
       const isLastLevel = level === rowGroupsLen - 1;
 
       if (isLastLevel) {
         result.push(...groupRows);
 
-        // Add subtotal if there are multiple rows in this group
         if (groupRows.length > 1) {
           const subtotalRow: any = {
             __isSubtotal: true,
             __subtotalLevel: level,
           };
 
-          // Copy parent group values
           for (let i = 0; i <= level; i++) {
             subtotalRow[rowGroups[i]] = groupRows[0][rowGroups[i]];
           }
 
-          // Mark as total with proper formatting
           subtotalRow[rowGroups[level]] = `Total ${groupKey}`;
 
-          // Calculate aggregated values - FIXED: only aggregate non-subtotal rows
           for (const colKey of valueCols) {
             const aggInfo = colAggInfo[colKey];
             if (aggInfo) {
@@ -395,11 +472,9 @@ function insertSubtotalRows(
 
           subtotalRow[rowGroups[level]] = `Total ${groupKey}`;
 
-          // Calculate aggregated values from child rows
           for (const colKey of valueCols) {
             const aggInfo = colAggInfo[colKey];
             if (aggInfo) {
-              // FIXED: Properly aggregate - sum subtotals, exclude them for avg
               if (aggInfo.agg === "sum" || aggInfo.agg === "count") {
                 const values = childRows
                   .map((r) => r[colKey])
@@ -413,7 +488,6 @@ function insertSubtotalRows(
                   subtotalRow[colKey] = null;
                 }
               } else if (aggInfo.agg === "avg") {
-                // For average, get non-subtotal rows only
                 const values = childRows
                   .filter((r) => !r.__isSubtotal)
                   .map((r) => r[colKey])
@@ -425,7 +499,6 @@ function insertSubtotalRows(
                   subtotalRow[colKey] = null;
                 }
               } else {
-                // min/max
                 const values = childRows
                   .map((r) => r[colKey])
                   .filter((v) => v != null);
@@ -452,9 +525,6 @@ function insertSubtotalRows(
   return result;
 }
 
-/**
- * Calculate grand total from all data rows (excluding subtotals)
- */
 function calculateGrandTotal(
   data: any[],
   rowGroups: string[],
@@ -467,12 +537,10 @@ function calculateGrandTotal(
     __isGrandTotal: true,
   };
 
-  // Set the label for the first row group
   if (rowGroups.length > 0) {
     grandTotalRow[rowGroups[0]] = "Grand Total";
   }
 
-  // Calculate grand total values from non-subtotal rows only
   const dataRows = data.filter((r) => !r.__isSubtotal && !r.__isGrandTotal);
 
   for (const colKey of valueCols) {
@@ -500,10 +568,6 @@ function calculateGrandTotal(
   return grandTotalRow;
 }
 
-/**
- * Main aggregation function with subtotals
- * Production-ready with optimizations
- */
 export function aggregateData(
   data: any[],
   rows: string[],
@@ -535,7 +599,6 @@ export function aggregateData(
   const valsLen = effectiveValues.length;
   const dataLen = data.length;
 
-  // Build row and cell data maps - using Map for better performance
   for (let i = 0; i < dataLen; i++) {
     const row = data[i];
     let rowKey = "";
@@ -603,7 +666,6 @@ export function aggregateData(
     }
   }
 
-  // Build base table
   const baseTable: Record<string, any>[] = [];
   const rowKeys = Array.from(rowDataMap.keys());
 
@@ -641,7 +703,6 @@ export function aggregateData(
     baseTable.push(rowObj);
   }
 
-  // Sort table by row groups
   baseTable.sort((a, b) => {
     for (let i = 0; i < rowsLen; i++) {
       const aVal = String(a[rows[i]] ?? "");
@@ -652,7 +713,6 @@ export function aggregateData(
     return 0;
   });
 
-  // Insert subtotal rows
   const tableWithSubtotals = insertSubtotalRows(
     baseTable,
     rows,
@@ -660,7 +720,6 @@ export function aggregateData(
     colAggInfo
   );
 
-  // Calculate grand total separately (not in table)
   const grandTotal = calculateGrandTotal(
     tableWithSubtotals,
     rows,

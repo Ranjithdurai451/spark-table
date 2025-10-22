@@ -1,17 +1,27 @@
-import { useMemo, useState, useEffect, memo } from "react";
+import { useMemo, useState, useEffect, memo, useRef, useCallback } from "react";
 import { usePivotStore } from "@/lib/store/pivot-store";
 import { Pagination } from "./Pagination";
+import { PivotWarningDialog } from "./PivotWarningDialog";
+import { AlertTriangle, Info } from "lucide-react";
 import {
   computeRowSpans,
   buildColHeaderTree,
   aggregateData,
+  estimatePivotSize,
+  limitColumnsForRendering,
   type AggregateDataResult,
+  type PivotEstimation,
 } from "./pivot-operations";
 
 interface ComputationState {
-  status: "idle" | "computing" | "ready" | "error";
+  status: "idle" | "awaiting-approval" | "computing" | "ready" | "error";
   data: AggregateDataResult | null;
   error?: string;
+  columnLimitInfo?: {
+    limited: boolean;
+    originalColumns: number;
+    displayedColumns: number;
+  };
 }
 
 // Memoized Row Component for performance
@@ -112,42 +122,124 @@ export const PivotTable = () => {
   const columns = usePivotStore((state) => state.columns);
   const values = usePivotStore((state) => state.values);
   const showRaw = usePivotStore((state) => state.showRaw);
+  const revertToPreviousState = usePivotStore(
+    (state) => state.revertToPreviousState
+  );
 
   const [computationState, setComputationState] = useState<ComputationState>({
     status: "idle",
     data: null,
   });
 
+  const [showWarningDialog, setShowWarningDialog] = useState(false);
+  const [estimation, setEstimation] = useState<PivotEstimation | null>(null);
+
+  const lastConfigRef = useRef<string>("");
   const [page, setPage] = useState(1);
   const pageSize = 50;
+
+  const configKey = useMemo(
+    () => JSON.stringify({ rows, columns, values, dataLength: data.length }),
+    [rows, columns, values, data.length]
+  );
 
   useEffect(() => {
     if (showRaw || (!rows.length && !columns.length && !values.length)) {
       setComputationState({ status: "idle", data: null });
+      setEstimation(null);
+      lastConfigRef.current = "";
       return;
     }
 
-    setComputationState({ status: "computing", data: null });
+    if (configKey === lastConfigRef.current) {
+      return;
+    }
 
-    const computeData = () => {
-      try {
-        const result = aggregateData(data, rows, columns, values);
-        setComputationState({ status: "ready", data: result });
-        setPage(1);
-      } catch (error) {
-        console.error("Aggregation error:", error);
-        setComputationState({
-          status: "error",
-          data: null,
-          error: error instanceof Error ? error.message : "Computation failed",
-        });
-      }
-    };
+    lastConfigRef.current = configKey;
 
-    const timeoutId = setTimeout(computeData, 100);
+    // Estimate only column count (rows are paginated)
+    const pivotEstimation = estimatePivotSize(data, columns, values);
+    setEstimation(pivotEstimation);
 
-    return () => clearTimeout(timeoutId);
-  }, [data, rows, columns, values, showRaw]);
+    if (pivotEstimation.shouldWarn) {
+      setComputationState({ status: "awaiting-approval", data: null });
+      setShowWarningDialog(true);
+    } else {
+      performComputation(false);
+    }
+  }, [configKey, showRaw]);
+
+  const performComputation = useCallback(
+    (limitColumns: boolean = false) => {
+      setComputationState({ status: "computing", data: null });
+      setShowWarningDialog(false);
+
+      setTimeout(() => {
+        try {
+          let dataToProcess = data;
+          let columnLimitInfo = {
+            limited: false,
+            originalColumns: 0,
+            displayedColumns: 0,
+          };
+
+          // Apply column limiting if user proceeded with warning
+          if (limitColumns && estimation && estimation.shouldWarn) {
+            const { limitedData, columnsLimited, originalColumns } =
+              limitColumnsForRendering(data, columns, 500);
+
+            dataToProcess = limitedData;
+
+            // Recalculate estimated columns with limited data
+            const newEstimation = estimatePivotSize(
+              limitedData,
+              columns,
+              values
+            );
+
+            columnLimitInfo = {
+              limited: columnsLimited,
+              originalColumns,
+              displayedColumns: newEstimation.estimatedColumns,
+            };
+          }
+
+          const result = aggregateData(dataToProcess, rows, columns, values);
+          setComputationState({
+            status: "ready",
+            data: result,
+            columnLimitInfo,
+          });
+          setPage(1);
+        } catch (error) {
+          console.error("Aggregation error:", error);
+          setComputationState({
+            status: "error",
+            data: null,
+            error:
+              error instanceof Error ? error.message : "Computation failed",
+          });
+        }
+      }, 100);
+    },
+    [data, rows, columns, values, estimation]
+  );
+
+  const handleWarningProceed = useCallback(() => {
+    // Proceed with column limiting
+    performComputation(true);
+  }, [performComputation]);
+
+  const handleWarningCancel = useCallback(() => {
+    setShowWarningDialog(false);
+    setComputationState({ status: "idle", data: null });
+
+    // Revert to previous state (remove the field that caused the warning)
+    revertToPreviousState();
+
+    // Reset the config ref
+    lastConfigRef.current = "";
+  }, [revertToPreviousState]);
 
   const { table, grandTotal, rowGroups, colGroups, valueCols } = useMemo(
     () =>
@@ -179,13 +271,47 @@ export const PivotTable = () => {
     return buildColHeaderTree(valueCols, colGroups);
   }, [valueCols, colGroups, computationState.status]);
 
+  // Render warning state
+  if (computationState.status === "awaiting-approval") {
+    return (
+      <>
+        <PivotWarningDialog
+          open={showWarningDialog}
+          onOpenChange={setShowWarningDialog}
+          estimatedColumns={estimation?.estimatedColumns || 0}
+          onProceed={handleWarningProceed}
+          onCancel={handleWarningCancel}
+        />
+        <div className="w-full h-full flex flex-col rounded-lg overflow-hidden bg-background border border-border">
+          <div className="flex-1 flex items-center justify-center">
+            <div className="text-center space-y-3">
+              <div className="flex justify-center">
+                <div className="p-3 rounded-full bg-yellow-500/10">
+                  <AlertTriangle className="h-8 w-8 text-yellow-500" />
+                </div>
+              </div>
+              <div className="space-y-1">
+                <p className="text-sm font-medium text-foreground">
+                  Too Many Columns
+                </p>
+                <p className="text-xs text-muted-foreground max-w-xs mx-auto">
+                  Please review the warning dialog.
+                </p>
+              </div>
+            </div>
+          </div>
+        </div>
+      </>
+    );
+  }
+
   if (computationState.status === "computing") {
     return (
       <div className="w-full h-full flex flex-col rounded-lg overflow-hidden bg-background border border-border">
         <div className="flex-1 flex items-center justify-center">
-          <div className="text-center">
-            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto mb-2" />
-            <p className="text-sm text-muted-foreground">
+          <div className="text-center space-y-3">
+            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto" />
+            <p className="text-sm font-medium text-foreground">
               Computing pivot table...
             </p>
           </div>
@@ -198,8 +324,13 @@ export const PivotTable = () => {
     return (
       <div className="w-full h-full flex flex-col rounded-lg overflow-hidden bg-background border border-border">
         <div className="flex-1 flex items-center justify-center">
-          <div className="text-center text-destructive">
-            <p className="text-sm">Error: {computationState.error}</p>
+          <div className="text-center text-destructive space-y-2">
+            <p className="text-sm font-medium">
+              Error: {computationState.error}
+            </p>
+            <p className="text-xs text-muted-foreground">
+              Please adjust your configuration and try again.
+            </p>
           </div>
         </div>
       </div>
@@ -208,10 +339,24 @@ export const PivotTable = () => {
 
   if (showRaw || (!visibleData.length && !leafCols.length)) return null;
 
-  const hasGrandTotal = grandTotal !== null;
+  const hasGrandTotal = grandTotal !== null && rowGroups.length > 0;
+  const { columnLimitInfo } = computationState;
 
   return (
     <div className="w-full h-full flex flex-col rounded-lg overflow-hidden bg-background border border-border">
+      {/* Column Limit Warning Banner */}
+      {columnLimitInfo?.limited && (
+        <div className="bg-yellow-500/10 border-b border-yellow-500/20 px-4 py-2 flex items-center gap-2">
+          <Info className="h-4 w-4 text-yellow-600 flex-shrink-0" />
+          <p className="text-xs text-yellow-700 dark:text-yellow-600">
+            <strong>Columns limited:</strong> Showing{" "}
+            {columnLimitInfo.displayedColumns} of{" "}
+            {columnLimitInfo.originalColumns} possible columns. Filter your data
+            or reduce column groupings for complete results.
+          </p>
+        </div>
+      )}
+
       <div className="flex-1 min-h-0 overflow-auto scrollbar-thin">
         <table
           className="w-full"
@@ -257,7 +402,6 @@ export const PivotTable = () => {
             ))}
           </tbody>
 
-          {/* Grand Total Footer - Sticky at bottom */}
           {hasGrandTotal && (
             <tfoot className="sticky bottom-0 z-10 bg-muted/80 backdrop-blur-sm">
               <tr className="border-t-2 border-border">
@@ -309,7 +453,6 @@ export const PivotTable = () => {
         </table>
       </div>
 
-      {/* Pagination */}
       {table.length > pageSize && (
         <div style={{ borderTop: "1px solid hsl(var(--border))" }}>
           <Pagination
