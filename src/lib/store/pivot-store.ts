@@ -1,6 +1,6 @@
 import { create } from "zustand";
 
-export type Agg = "sum" | "avg" | "count";
+export type Agg = "sum" | "avg" | "count" | "min" | "max";
 export type Zone = "rows" | "columns" | "values" | "data";
 
 type ValueItem = { field: string; agg: Agg };

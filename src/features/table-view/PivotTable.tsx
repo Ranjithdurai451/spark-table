@@ -11,6 +11,8 @@ import {
   limitColumnsForRendering,
   type AggregateDataResult,
   type PivotEstimation,
+  type CellStats,
+  type RowSpanInfo,
 } from "./pivot-operations";
 
 interface ComputationState {
@@ -31,20 +33,50 @@ const TableRow = memo(
     rowGroups,
     rowSpans,
     leafCols,
+    colAggInfo,
   }: {
     row: any;
     rowIndex: number;
     rowGroups: string[];
-    rowSpans: Record<number, any[]>;
+    rowSpans: Record<number, RowSpanInfo[]>;
     leafCols: string[];
+    colAggInfo: Record<string, { field: string; agg: string }>;
   }) => {
     const isSubtotal = row.__isSubtotal || false;
     const subtotalLevel = row.__subtotalLevel ?? -1;
 
+    const getAggValue = useCallback(
+      (rowData: any, colKey: string): number | null => {
+        const cell = rowData[colKey];
+        if (!cell || typeof cell !== "object") return null;
+        const stats = cell as CellStats;
+        const aggInfo = colAggInfo[colKey];
+        if (!aggInfo) return null;
+        const { agg } = aggInfo;
+        switch (agg) {
+          case "sum":
+            return stats.sum ?? null;
+          case "count":
+            return stats.rawCount;
+          case "avg":
+            return stats.validCount > 0
+              ? (stats.sum ?? 0) / stats.validCount
+              : null;
+          case "min":
+            return stats.min ?? null;
+          case "max":
+            return stats.max ?? null;
+          default:
+            return null;
+        }
+      },
+      [colAggInfo]
+    );
+
     return (
       <tr
         className={`group transition-colors ${
-          isSubtotal ? "bg-muted/50" : "bg-background"
+          isSubtotal ? "bg-muted/30" : "bg-background"
         } `}
       >
         {rowGroups.map((col, groupIndex) => {
@@ -84,9 +116,10 @@ const TableRow = memo(
         })}
 
         {leafCols.map((col, colIndex) => {
-          const value = row[col];
-          const isNum = typeof value === "number";
-          const isEmpty = value === undefined || value === null || value === "";
+          const value = getAggValue(row, col);
+          const isNum = typeof value === "number" && isFinite(value);
+          const isEmpty =
+            value === null || value === undefined || !isFinite(value);
 
           return (
             <td
@@ -98,12 +131,10 @@ const TableRow = memo(
               <span className="truncate block">
                 {isEmpty
                   ? "-"
-                  : isNum
-                  ? value.toLocaleString(undefined, {
+                  : value!.toLocaleString(undefined, {
                       maximumFractionDigits: 2,
                       minimumFractionDigits: 0,
-                    })
-                  : String(value)}
+                    })}
               </span>
             </td>
           );
@@ -236,7 +267,7 @@ export const PivotTable = () => {
     lastConfigRef.current = "";
   }, [revertToPreviousState]);
 
-  const { table, grandTotal, rowGroups, colGroups, valueCols } = useMemo(
+  const computationResult = useMemo(
     () =>
       computationState.data || {
         table: [],
@@ -244,9 +275,14 @@ export const PivotTable = () => {
         rowGroups: [],
         colGroups: [],
         valueCols: [],
+        widths: {},
+        colAggInfo: {},
       },
     [computationState.data]
   );
+
+  const { table, grandTotal, rowGroups, colGroups, valueCols, colAggInfo } =
+    computationResult;
 
   const startIdx = (page - 1) * pageSize;
   const visibleData = useMemo(
@@ -265,6 +301,34 @@ export const PivotTable = () => {
     }
     return buildColHeaderTree(valueCols, colGroups);
   }, [valueCols, colGroups, computationState.status]);
+
+  const getAggValue = useCallback(
+    (rowData: any, colKey: string): number | null => {
+      const cell = rowData[colKey];
+      if (!cell || typeof cell !== "object") return null;
+      const stats = cell as CellStats;
+      const aggInfo = colAggInfo[colKey];
+      if (!aggInfo) return null;
+      const { agg } = aggInfo;
+      switch (agg) {
+        case "sum":
+          return stats.sum ?? null;
+        case "count":
+          return stats.rawCount;
+        case "avg":
+          return stats.validCount > 0
+            ? (stats.sum ?? 0) / stats.validCount
+            : null;
+        case "min":
+          return stats.min ?? null;
+        case "max":
+          return stats.max ?? null;
+        default:
+          return null;
+      }
+    },
+    [colAggInfo]
+  );
 
   if (computationState.status === "awaiting-approval") {
     return (
@@ -337,7 +401,7 @@ export const PivotTable = () => {
   const { columnLimitInfo } = computationState;
 
   return (
-    <div className="w-full h-full flex flex-col rounded-lg overflow-hidden bg-background border border-border">
+    <div className="w-full h-full flex flex-col  overflow-hidden bg-background border border-border">
       {/* Column Limit Warning Banner */}
       {columnLimitInfo?.limited && (
         <div className="bg-yellow-500/10 border-b border-yellow-500/20 px-4 py-2 flex items-center gap-2">
@@ -392,12 +456,13 @@ export const PivotTable = () => {
                 rowGroups={rowGroups}
                 rowSpans={rowSpans}
                 leafCols={leafCols}
+                colAggInfo={colAggInfo}
               />
             ))}
           </tbody>
 
           {hasGrandTotal && (
-            <tfoot className="sticky bottom-0  z-10 bg-muted/80 backdrop-blur-sm">
+            <tfoot className="sticky bottom-0 z-10 bg-muted/80 backdrop-blur-sm">
               <tr className="border-t-2 border-border">
                 {rowGroups.map((col, groupIndex) => {
                   if (groupIndex > 0) return null;
@@ -416,10 +481,10 @@ export const PivotTable = () => {
                 })}
 
                 {leafCols.map((col, colIndex) => {
-                  const value = grandTotal[col];
-                  const isNum = typeof value === "number";
+                  const value = getAggValue(grandTotal, col);
+                  const isNum = typeof value === "number" && isFinite(value);
                   const isEmpty =
-                    value === undefined || value === null || value === "";
+                    value === null || value === undefined || !isFinite(value);
 
                   return (
                     <td
@@ -431,12 +496,10 @@ export const PivotTable = () => {
                       <span className="truncate block">
                         {isEmpty
                           ? "—"
-                          : isNum
-                          ? value.toLocaleString(undefined, {
+                          : value!.toLocaleString(undefined, {
                               maximumFractionDigits: 2,
                               minimumFractionDigits: 0,
-                            })
-                          : String(value)}
+                            })}
                       </span>
                     </td>
                   );

@@ -293,5 +293,5 @@
 }
 
 .scrollbar-thin::-webkit-scrollbar-thumb {
-  background-color: oklch(from var(--primary) l c h / 0.2);
+  background-color: oklch(from var(--muted) l c h / 1);
 }

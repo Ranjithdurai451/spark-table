@@ -3,6 +3,14 @@ export interface AggregationValue {
   agg: "sum" | "avg" | "count" | "min" | "max";
 }
 
+export interface CellStats {
+  rawCount: number;
+  validCount: number;
+  sum: number | null;
+  min: number | null;
+  max: number | null;
+}
+
 export interface AggregateDataResult {
   table: Record<string, any>[];
   grandTotal: Record<string, any> | null;
@@ -10,6 +18,7 @@ export interface AggregateDataResult {
   colGroups: string[];
   valueCols: string[];
   widths: Record<string, number>;
+  colAggInfo: Record<string, { field: string; agg: string }>;
 }
 
 export interface HeaderCell {
@@ -35,6 +44,91 @@ export interface PivotEstimation {
 }
 
 const COLUMN_WARNING_THRESHOLD = 200;
+
+export function computeCellStats(rows: any[], field: string): CellStats {
+  let rawCount = rows.length;
+  let validCount = 0;
+  let sum = 0;
+  let minVal = Infinity;
+  let maxVal = -Infinity;
+  let hasValid = false;
+
+  for (const row of rows) {
+    const numVal = Number(row[field]);
+    if (!isNaN(numVal) && isFinite(numVal)) {
+      sum += numVal;
+      minVal = Math.min(minVal, numVal);
+      maxVal = Math.max(maxVal, numVal);
+      validCount++;
+      hasValid = true;
+    }
+  }
+
+  const stats: CellStats = {
+    rawCount,
+    validCount,
+    sum: null,
+    min: null,
+    max: null,
+  };
+  if (hasValid) {
+    stats.sum = sum;
+    stats.min = minVal;
+    stats.max = maxVal;
+  }
+
+  return stats;
+}
+
+function computeAggregatedStats(statsList: CellStats[]): CellStats {
+  if (statsList.length === 0) {
+    return {
+      rawCount: 0,
+      validCount: 0,
+      sum: null,
+      min: null,
+      max: null,
+    };
+  }
+
+  let totalRaw = 0;
+  let totalValid = 0;
+  let totalSum = 0;
+  let minVal = Infinity;
+  let maxVal = -Infinity;
+  let hasValid = false;
+
+  for (const s of statsList) {
+    totalRaw += s.rawCount;
+    totalValid += s.validCount;
+    if (s.validCount > 0) {
+      totalSum += s.sum ?? 0;
+      if (s.min !== null) {
+        minVal = Math.min(minVal, s.min);
+      }
+      if (s.max !== null) {
+        maxVal = Math.max(maxVal, s.max);
+      }
+      hasValid = true;
+    }
+  }
+
+  const agg: CellStats = {
+    rawCount: totalRaw,
+    validCount: totalValid,
+    sum: null,
+    min: null,
+    max: null,
+  };
+
+  if (hasValid) {
+    agg.sum = totalSum;
+    agg.min = minVal < Infinity ? minVal : null;
+    agg.max = maxVal > -Infinity ? maxVal : null;
+  }
+
+  return agg;
+}
 
 export function estimatePivotSize(
   data: any[],
@@ -83,7 +177,6 @@ export function limitColumnsForRendering(
     return { limitedData: data, columnsLimited: false, originalColumns: 0 };
   }
 
-  // First, calculate how many unique column combinations we have
   const colValues = new Map<string, Set<any>>();
 
   for (const colField of cols) {
@@ -93,7 +186,6 @@ export function limitColumnsForRendering(
     }
   }
 
-  // Calculate total combinations
   let totalCombos = 1;
   colValues.forEach((values) => {
     totalCombos *= values.size;
@@ -107,11 +199,10 @@ export function limitColumnsForRendering(
     };
   }
 
-  // Limit the first column field to reduce combinations
   const firstColField = cols[0];
-  const firstColValues = Array.from(colValues.get(firstColField)!);
+  let firstColValues = Array.from(colValues.get(firstColField)!);
+  firstColValues.sort((a, b) => String(a).localeCompare(String(b)));
 
-  // Calculate how many values we can keep
   const maxValuesForFirstCol = Math.floor(
     maxColumns / (totalCombos / firstColValues.length)
   );
@@ -120,7 +211,6 @@ export function limitColumnsForRendering(
     Math.max(10, maxValuesForFirstCol)
   );
 
-  // Filter data to only include limited column values
   const limitedData = data.filter((row) =>
     limitedFirstColValues.includes(row[firstColField] ?? "N/A")
   );
@@ -223,6 +313,16 @@ export function buildColHeaderTree(
     });
   }
 
+  // Sort leaves for consistent order
+  leaves.sort((a, b) => {
+    const aPathStr = a.path.join("|||");
+    const bPathStr = b.path.join("|||");
+    if (aPathStr !== bPathStr) {
+      return aPathStr.localeCompare(bPathStr);
+    }
+    return a.leafLabel.localeCompare(b.leafLabel);
+  });
+
   const buildTree = (): any[] => {
     if (groupFieldsLen === 0) {
       return leaves.map((f) => ({ ...f, children: [] }));
@@ -235,24 +335,28 @@ export function buildColHeaderTree(
       return items.map((f) => ({ ...f, children: [] }));
     }
 
-    const groups = new Map<string, ColumnLeaf[]>();
+    const groups: Record<string, ColumnLeaf[]> = {};
 
     for (let i = 0; i < items.length; i++) {
       const item = items[i];
       const key = item.path[level] ?? "";
-      if (!groups.has(key)) {
-        groups.set(key, []);
+      if (!groups[key]) {
+        groups[key] = [];
       }
-      groups.get(key)!.push(item);
+      groups[key].push(item);
     }
 
+    const sortedKeys = Object.keys(groups).sort((k1, k2) =>
+      k1.localeCompare(k2)
+    );
     const result: any[] = [];
-    groups.forEach((children, label) => {
+    for (const label of sortedKeys) {
+      const children = groups[label];
       result.push({
         label,
         children: buildTreeLevel(children, level + 1),
       });
-    });
+    }
 
     return result;
   };
@@ -309,70 +413,6 @@ export function buildColHeaderTree(
   };
 }
 
-function aggregateRows(rows: any[], field: string, agg: string): number | null {
-  if (!rows.length) return null;
-
-  switch (agg) {
-    case "count":
-      return rows.length;
-
-    case "sum": {
-      let sum = 0;
-      let hasValidValue = false;
-      for (const row of rows) {
-        const numVal = Number(row[field]);
-        if (!isNaN(numVal) && isFinite(numVal)) {
-          sum += numVal;
-          hasValidValue = true;
-        }
-      }
-      return hasValidValue ? sum : null;
-    }
-
-    case "avg": {
-      let sum = 0;
-      let count = 0;
-      for (const row of rows) {
-        const numVal = Number(row[field]);
-        if (!isNaN(numVal) && isFinite(numVal)) {
-          sum += numVal;
-          count++;
-        }
-      }
-      return count > 0 ? sum / count : null;
-    }
-
-    case "min": {
-      let min = Infinity;
-      let hasValidValue = false;
-      for (const row of rows) {
-        const num = Number(row[field]);
-        if (!isNaN(num) && isFinite(num) && num < min) {
-          min = num;
-          hasValidValue = true;
-        }
-      }
-      return hasValidValue ? min : null;
-    }
-
-    case "max": {
-      let max = -Infinity;
-      let hasValidValue = false;
-      for (const row of rows) {
-        const num = Number(row[field]);
-        if (!isNaN(num) && isFinite(num) && num > max) {
-          max = num;
-          hasValidValue = true;
-        }
-      }
-      return hasValidValue ? max : null;
-    }
-
-    default:
-      return null;
-  }
-}
-
 function insertSubtotalRows(
   data: any[],
   rowGroups: string[],
@@ -403,12 +443,19 @@ function insertSubtotalRows(
       groups.get(key)!.push(row);
     }
 
-    groups.forEach((groupRows, groupKey) => {
+    // Sort groups for consistent order
+    const sortedEntries = Array.from(groups.entries()).sort(([a], [b]) =>
+      a.localeCompare(b)
+    );
+
+    for (const [groupKey, groupRows] of sortedEntries) {
       const isLastLevel = level === rowGroupsLen - 1;
 
       if (isLastLevel) {
+        // LEAF LEVEL: Add data rows first
         result.push(...groupRows);
 
+        // Add subtotal if multiple rows exist
         if (groupRows.length > 1) {
           const subtotalRow: any = {
             __isSubtotal: true,
@@ -421,37 +468,24 @@ function insertSubtotalRows(
 
           subtotalRow[rowGroups[level]] = `Total ${groupKey}`;
 
+          // Calculate aggregations for leaf level
           for (const colKey of valueCols) {
             const aggInfo = colAggInfo[colKey];
             if (aggInfo) {
-              const values = groupRows
-                .filter((r) => !r.__isSubtotal)
-                .map((r) => r[colKey])
-                .filter((v) => v != null);
-
-              if (values.length > 0) {
-                if (aggInfo.agg === "sum" || aggInfo.agg === "count") {
-                  subtotalRow[colKey] = values.reduce(
-                    (sum, val) => sum + val,
-                    0
-                  );
-                } else if (aggInfo.agg === "avg") {
-                  subtotalRow[colKey] =
-                    values.reduce((sum, val) => sum + val, 0) / values.length;
-                } else if (aggInfo.agg === "min") {
-                  subtotalRow[colKey] = Math.min(...values);
-                } else if (aggInfo.agg === "max") {
-                  subtotalRow[colKey] = Math.max(...values);
-                }
-              } else {
-                subtotalRow[colKey] = null;
-              }
+              const dataRows = groupRows.filter((r) => !r.__isSubtotal);
+              const statsList: CellStats[] = dataRows.map(
+                (r) => r[colKey] as CellStats
+              );
+              subtotalRow[colKey] = computeAggregatedStats(statsList);
+            } else {
+              subtotalRow[colKey] = null;
             }
           }
 
           result.push(subtotalRow);
         }
       } else {
+        // NON-LEAF LEVEL: Process children recursively first
         const childStartIdx = result.length;
         processLevel(groupRows, level + 1, [...parentValues, groupKey]);
         const childEndIdx = result.length;
@@ -459,6 +493,7 @@ function insertSubtotalRows(
         const childRows = result.slice(childStartIdx, childEndIdx);
         const hasMultipleChildren = childRows.length > 1;
 
+        // Add parent subtotal if there are multiple children
         if (hasMultipleChildren) {
           const subtotalRow: any = {
             __isSubtotal: true,
@@ -471,52 +506,45 @@ function insertSubtotalRows(
 
           subtotalRow[rowGroups[level]] = `Total ${groupKey}`;
 
+          // Calculate aggregations for parent level
           for (const colKey of valueCols) {
             const aggInfo = colAggInfo[colKey];
             if (aggInfo) {
-              if (aggInfo.agg === "sum" || aggInfo.agg === "count") {
-                const values = childRows
-                  .map((r) => r[colKey])
-                  .filter((v) => v != null);
-                if (values.length > 0) {
-                  subtotalRow[colKey] = values.reduce(
-                    (sum, val) => sum + val,
-                    0
+              // Find child subtotals and standalone data rows
+              const childSubtotals = childRows.filter(
+                (r) => r.__isSubtotal && r.__subtotalLevel === level + 1
+              );
+
+              const standaloneDataRows = childRows.filter((r) => {
+                if (r.__isSubtotal) return false;
+
+                // Check if this row has a sibling subtotal
+                const rowGroupValue = r[rowGroups[level + 1]];
+                const hasSubtotal = childSubtotals.some((sub) => {
+                  const subtotalLabel = sub[rowGroups[level + 1]];
+                  return (
+                    subtotalLabel === rowGroupValue ||
+                    subtotalLabel === `Total ${rowGroupValue}`
                   );
-                } else {
-                  subtotalRow[colKey] = null;
-                }
-              } else if (aggInfo.agg === "avg") {
-                const values = childRows
-                  .filter((r) => !r.__isSubtotal)
-                  .map((r) => r[colKey])
-                  .filter((v) => v != null);
-                if (values.length > 0) {
-                  subtotalRow[colKey] =
-                    values.reduce((sum, val) => sum + val, 0) / values.length;
-                } else {
-                  subtotalRow[colKey] = null;
-                }
-              } else {
-                const values = childRows
-                  .map((r) => r[colKey])
-                  .filter((v) => v != null);
-                if (values.length > 0) {
-                  subtotalRow[colKey] =
-                    aggInfo.agg === "min"
-                      ? Math.min(...values)
-                      : Math.max(...values);
-                } else {
-                  subtotalRow[colKey] = null;
-                }
-              }
+                });
+
+                return !hasSubtotal;
+              });
+
+              const relevantRows = [...childSubtotals, ...standaloneDataRows];
+              const statsList: CellStats[] = relevantRows.map(
+                (r) => r[colKey] as CellStats
+              );
+              subtotalRow[colKey] = computeAggregatedStats(statsList);
+            } else {
+              subtotalRow[colKey] = null;
             }
           }
 
           result.push(subtotalRow);
         }
       }
-    });
+    }
   };
 
   processLevel(data, 0, []);
@@ -540,27 +568,36 @@ function calculateGrandTotal(
     grandTotalRow[rowGroups[0]] = "Grand Total";
   }
 
-  const dataRows = data.filter((r) => !r.__isSubtotal && !r.__isGrandTotal);
-
   for (const colKey of valueCols) {
     const aggInfo = colAggInfo[colKey];
     if (aggInfo) {
-      const values = dataRows.map((r) => r[colKey]).filter((v) => v != null);
+      // Get top-level subtotals (level 0)
+      const topLevelSubtotals = data.filter(
+        (r) => r.__isSubtotal && r.__subtotalLevel === 0
+      );
 
-      if (values.length > 0) {
-        if (aggInfo.agg === "sum" || aggInfo.agg === "count") {
-          grandTotalRow[colKey] = values.reduce((sum, val) => sum + val, 0);
-        } else if (aggInfo.agg === "avg") {
-          grandTotalRow[colKey] =
-            values.reduce((sum, val) => sum + val, 0) / values.length;
-        } else if (aggInfo.agg === "min") {
-          grandTotalRow[colKey] = Math.min(...values);
-        } else if (aggInfo.agg === "max") {
-          grandTotalRow[colKey] = Math.max(...values);
-        }
-      } else {
-        grandTotalRow[colKey] = null;
-      }
+      // Get rows that have no subtotal at all (standalone rows)
+      const standaloneRows = data.filter((r) => {
+        if (r.__isSubtotal) return false;
+
+        // Check if this row has a parent subtotal at level 0
+        const rowKey = rowGroups.length > 0 ? r[rowGroups[0]] : null;
+        const hasParentSubtotal = topLevelSubtotals.some((sub) => {
+          // Check if subtotal belongs to same group
+          return (
+            sub[rowGroups[0]] === rowKey ||
+            sub[rowGroups[0]]?.startsWith(`Total ${rowKey}`)
+          );
+        });
+
+        return !hasParentSubtotal;
+      });
+
+      const relevantRows = [...topLevelSubtotals, ...standaloneRows];
+      const statsList: CellStats[] = relevantRows.map(
+        (r) => r[colKey] as CellStats
+      );
+      grandTotalRow[colKey] = computeAggregatedStats(statsList);
     }
   }
 
@@ -581,6 +618,7 @@ export function aggregateData(
       colGroups: cols,
       valueCols: [],
       widths: {},
+      colAggInfo: {},
     };
   }
 
@@ -597,6 +635,9 @@ export function aggregateData(
   const colsLen = cols.length;
   const valsLen = effectiveValues.length;
   const dataLen = data.length;
+
+  // Preserve insertion order by tracking row key order
+  const rowKeyOrder: string[] = [];
 
   for (let i = 0; i < dataLen; i++) {
     const row = data[i];
@@ -616,6 +657,7 @@ export function aggregateData(
 
     if (!rowDataMap.has(rowKey)) {
       rowDataMap.set(rowKey, []);
+      rowKeyOrder.push(rowKey);
     }
     rowDataMap.get(rowKey)!.push(row);
 
@@ -646,7 +688,34 @@ export function aggregateData(
     }
   }
 
-  const colKeys = Array.from(colKeysSet);
+  // Sort rowKeyOrder for consistent lex order
+  rowKeyOrder.sort((a, b) => {
+    const aParts = a.split("|||");
+    const bParts = b.split("|||");
+    const minLen = Math.min(aParts.length, bParts.length);
+    for (let i = 0; i < minLen; i++) {
+      if (aParts[i] !== bParts[i]) {
+        return aParts[i].localeCompare(bParts[i]);
+      }
+    }
+    return 0;
+  });
+
+  let colKeys = Array.from(colKeysSet);
+  // Sort colKeys for consistent lex order
+  colKeys.sort((a, b) => {
+    const aParts = a.split("|||");
+    const bParts = b.split("|||");
+    const aPath = aParts.slice(0, colsLen).join("|||");
+    const bPath = bParts.slice(0, colsLen).join("|||");
+    if (aPath !== bPath) {
+      return aPath.localeCompare(bPath);
+    }
+    const aLast = aParts.slice(colsLen).join("|||");
+    const bLast = bParts.slice(colsLen).join("|||");
+    return aLast.localeCompare(bLast);
+  });
+
   const colAggInfo: Record<string, { field: string; agg: string }> = {};
 
   for (let i = 0; i < colKeys.length; i++) {
@@ -666,10 +735,10 @@ export function aggregateData(
   }
 
   const baseTable: Record<string, any>[] = [];
-  const rowKeys = Array.from(rowDataMap.keys());
 
-  for (let r = 0; r < rowKeys.length; r++) {
-    const rowKey = rowKeys[r];
+  // Use sorted rowKeyOrder to preserve order
+  for (let r = 0; r < rowKeyOrder.length; r++) {
+    const rowKey = rowKeyOrder[r];
     const rowObj: Record<string, any> = {};
 
     if (rowsLen > 0) {
@@ -684,33 +753,18 @@ export function aggregateData(
       const cellKey = `${rowKey}::${colKey}`;
       const filteredRows = cellDataMap.get(cellKey);
 
-      if (!filteredRows || filteredRows.length === 0) {
-        rowObj[colKey] = null;
-        continue;
-      }
-
       const aggInfo = colAggInfo[colKey];
       if (!aggInfo) {
         rowObj[colKey] = null;
         continue;
       }
 
-      const { field, agg } = aggInfo;
-      rowObj[colKey] = aggregateRows(filteredRows, field, agg);
+      const { field } = aggInfo;
+      rowObj[colKey] = computeCellStats(filteredRows || [], field);
     }
 
     baseTable.push(rowObj);
   }
-
-  baseTable.sort((a, b) => {
-    for (let i = 0; i < rowsLen; i++) {
-      const aVal = String(a[rows[i]] ?? "");
-      const bVal = String(b[rows[i]] ?? "");
-      if (aVal < bVal) return -1;
-      if (aVal > bVal) return 1;
-    }
-    return 0;
-  });
 
   const tableWithSubtotals = insertSubtotalRows(
     baseTable,
@@ -738,5 +792,6 @@ export function aggregateData(
     colGroups: cols,
     valueCols: colKeys,
     widths,
+    colAggInfo,
   };
 }
