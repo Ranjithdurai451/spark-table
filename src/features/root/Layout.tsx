@@ -96,7 +96,7 @@ export default function Layout() {
             )}
           </div>
         </div>
-        <div className="hidden md:block flex-shrink-0">
+        <div className="hidden lg:block flex-shrink-0">
           <SidebarControls
             fields={usePivotStore.getState().fields}
             className="border-l"
@@ -106,7 +106,7 @@ export default function Layout() {
 
       {/* Mobile Notification - Fixed Bottom Right */}
       {!dismissed && (
-        <div className="md:hidden fixed bottom-4 right-4 left-4 z-50 animate-in slide-in-from-bottom-5">
+        <div className="lg:hidden fixed bottom-4 right-4 left-4 z-50 animate-in slide-in-from-bottom-5">
           <div className="bg-card border rounded-lg shadow-lg p-4">
             <div className="flex items-start gap-3">
               <Monitor className="h-5 w-5 text-muted-foreground flex-shrink-0 mt-0.5" />

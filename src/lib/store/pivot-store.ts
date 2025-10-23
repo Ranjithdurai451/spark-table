@@ -99,7 +99,7 @@ function inferFieldsMetadata(rows: any[]) {
         val !== null &&
         val !== undefined &&
         val !== "" &&
-        isFinite(Number(val))
+        !isNaN(parseFloat(String(val).replace(/,/g, "")))
       ) {
         numericCount++;
       }
