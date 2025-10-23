@@ -133,19 +133,18 @@ export const SidebarControls = ({
     >
       <aside
         className={cn(
-          "h-full border-l bg-background relative flex transition-all duration-300 ease-in-out",
+          "h-full  bg-background relative flex transition-all duration-300 ease-in-out",
           className
         )}
         style={{ width }}
         aria-label="Sidebar controls"
       >
-        <div className="flex flex-1 min-w-0">
+        <div className="flex flex-1 py-4 min-w-0 gap-2">
           {open.viz && (
             <PanelShell
               title="Visualizations"
               onClose={() => setOpen((p) => ({ ...p, viz: false }))}
               width={panelW}
-              showRightBorder={open.data}
             >
               <div className="space-y-4">
                 <DropZoneArea
@@ -174,18 +173,14 @@ export const SidebarControls = ({
               title="Data"
               onClose={() => setOpen((p) => ({ ...p, data: false }))}
               width={panelW}
-              showRightBorder={false}
             >
               <DataPanel fields={fields} />
             </PanelShell>
           )}
         </div>
 
-        <div
-          className="h-full border-l bg-muted/40 flex-shrink-0"
-          style={{ width: railW }}
-        >
-          <div className="h-full flex flex-col items-center gap-2 py-3">
+        <div className="h-full   flex-shrink-0" style={{ width: railW }}>
+          <div className="h-full flex flex-col items-center gap-2 py-8">
             <Tab
               active={open.viz}
               icon={<LayoutDashboard className="h-4 w-4" />}

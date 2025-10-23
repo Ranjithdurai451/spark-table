@@ -73,7 +73,7 @@ export default function Layout() {
 
       <section className="flex-1 min-h-0 flex flex-row">
         <div className="h-full flex-1 p-4 min-w-0">
-          <div className="h-full w-full border overflow-hidden flex flex-col">
+          <div className="h-full w-full border overflow-hidden rounded flex flex-col">
             {data.length === 0 ? (
               <div className="flex-1 flex items-center justify-center">
                 <div className="text-center space-y-2">
@@ -97,10 +97,7 @@ export default function Layout() {
           </div>
         </div>
         <div className="hidden lg:block flex-shrink-0">
-          <SidebarControls
-            fields={usePivotStore.getState().fields}
-            className="border-l"
-          />
+          <SidebarControls fields={usePivotStore.getState().fields} />
         </div>
       </section>
 

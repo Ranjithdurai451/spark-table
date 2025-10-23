@@ -13,7 +13,7 @@ export const Tab = ({ active, icon, label, onClick }: TabProps) => {
       className={cn(
         "flex py-4 w-9 items-center justify-center rounded border transition-all duration-200 ease-in-out",
         active
-          ? "bg-primary/75 border-input"
+          ? "bg-primary border-input"
           : "bg-background border-border hover:bg-muted/50"
       )}
       onClick={onClick}

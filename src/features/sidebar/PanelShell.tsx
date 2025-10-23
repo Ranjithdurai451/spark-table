@@ -7,20 +7,17 @@ interface PanelShellProps {
   children: React.ReactNode;
   onClose: () => void;
   width: number;
-  showRightBorder?: boolean;
 }
 export const PanelShell = ({
   title,
   children,
   onClose,
   width,
-  showRightBorder,
 }: PanelShellProps) => {
   return (
     <div
       className={cn(
-        "h-full bg-background flex flex-col overflow-hidden transition-all duration-300 ease-in-out",
-        showRightBorder && "border-r"
+        "h-full border rounded bg-background flex flex-col overflow-hidden transition-all duration-300 ease-in-out"
       )}
       style={{ width }}
     >
