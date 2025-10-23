@@ -5,7 +5,14 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { FileSpreadsheet, ChevronDown, RotateCcw, Upload } from "lucide-react";
+import {
+  FileSpreadsheet,
+  ChevronDown,
+  RotateCcw,
+  Upload,
+  Monitor,
+  X,
+} from "lucide-react";
 import { UploadDialog } from "../upload/UploadDialog";
 import { usePivotStore } from "@/lib/store/pivot-store";
 import { useState } from "react";
@@ -14,6 +21,7 @@ import { TableView } from "../table-view/TableView";
 
 export default function Layout() {
   const [openUpload, setOpenUpload] = useState(false);
+  const [dismissed, setDismissed] = useState(false);
   const { data, fileName, clearData } = usePivotStore();
 
   return (
@@ -39,7 +47,7 @@ export default function Layout() {
                   className="gap-2 bg-transparent"
                 >
                   <FileSpreadsheet className="h-4 w-4" />
-                  <span className="max-w-[18ch] sm:max-w-[28ch]  truncate">
+                  <span className="max-w-[18ch] sm:max-w-[28ch] truncate">
                     {fileName ?? "Data loaded"}
                   </span>
                   <ChevronDown className="h-4 w-4 text-muted-foreground" />
@@ -95,6 +103,30 @@ export default function Layout() {
           />
         </div>
       </section>
+
+      {/* Mobile Notification - Fixed Bottom Right */}
+      {!dismissed && (
+        <div className="md:hidden fixed bottom-4 right-4 left-4 z-50 animate-in slide-in-from-bottom-5">
+          <div className="bg-card border rounded-lg shadow-lg p-4">
+            <div className="flex items-start gap-3">
+              <Monitor className="h-5 w-5 text-muted-foreground flex-shrink-0 mt-0.5" />
+              <div className="flex-1">
+                <p className="text-sm font-medium">Desktop Mode Required</p>
+                <p className="text-xs text-muted-foreground mt-1">
+                  Use desktop for pivot tables and aggregations
+                </p>
+              </div>
+              <button
+                onClick={() => setDismissed(true)}
+                className="flex-shrink-0 rounded-sm opacity-70 hover:opacity-100 transition-opacity"
+                aria-label="Dismiss"
+              >
+                <X className="h-4 w-4" />
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       <UploadDialog open={openUpload} onOpenChange={setOpenUpload} />
     </main>

@@ -38,12 +38,36 @@ export const DataPanel = ({ fields }: { fields: string[] }) => {
     }
   }
 
+  function clearAllFields() {
+    fields.forEach((f) => {
+      if (hasFieldAnywhere(f)) {
+        const z = getZoneOfField(f);
+        if (z) removeFromZone(z, f);
+      }
+    });
+  }
+
+  const hasActiveFields = fields.some((f) => hasFieldAnywhere(f));
+
   return (
     <div className="flex h-full flex-col gap-3">
-      <label className="flex items-center gap-2 text-sm cursor-pointer">
-        <Checkbox checked={showRaw} onCheckedChange={setShowRaw} />
-        <span className="text-muted-foreground">Show full table</span>
-      </label>
+      <div className="flex w-full items-center justify-between">
+        <label className="flex items-center gap-2 text-sm cursor-pointer">
+          <Checkbox checked={showRaw} onCheckedChange={setShowRaw} />
+          <span className="text-muted-foreground">Show full table</span>
+        </label>
+        {hasActiveFields && (
+          <button
+            type="button"
+            className="text-xs text-destructive hover:text-destructive/80 cursor-pointer select-none text-right"
+            onClick={clearAllFields}
+            aria-label="Clear all fields"
+            title="Clear all fields"
+          >
+            Clear All
+          </button>
+        )}
+      </div>
 
       <div className="relative">
         <Input

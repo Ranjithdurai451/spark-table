@@ -397,7 +397,7 @@ export const PivotTable = () => {
           </tbody>
 
           {hasGrandTotal && (
-            <tfoot className="sticky bottom-0 z-10 bg-muted/80 backdrop-blur-sm">
+            <tfoot className="sticky bottom-0  z-10 bg-muted/80 backdrop-blur-sm">
               <tr className="border-t-2 border-border">
                 {rowGroups.map((col, groupIndex) => {
                   if (groupIndex > 0) return null;
