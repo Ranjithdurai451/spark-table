@@ -49,7 +49,6 @@ export const SidebarControls = ({
     addToZone,
     moveBetweenZones,
     removeFromZone,
-    numericFields,
     getZoneOfField,
     clearZone,
   } = usePivotStore();
