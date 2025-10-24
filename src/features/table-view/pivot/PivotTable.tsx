@@ -1,5 +1,5 @@
-import { useMemo, useState, useEffect, useCallback } from "react";
-import { usePivotStore } from "@/lib/store/pivot-store";
+import { useMemo, useState, useEffect, useCallback, useRef } from "react";
+import { usePivotStore } from "@/features/table-view/pivot/pivot-store";
 import { Pagination } from "../Pagination";
 import { PivotWarningDialog } from "./PivotWarningDialog";
 import { AlertTriangle, Info } from "lucide-react";
@@ -28,6 +28,8 @@ interface ComputationState {
   };
 }
 
+const createColumnsKey = (cols: string[]): string => cols.join(":::");
+
 export const PivotTable = () => {
   const data = usePivotStore((state) => state.data);
   const rows = usePivotStore((state) => state.rows);
@@ -44,35 +46,52 @@ export const PivotTable = () => {
   });
 
   const [showWarningDialog, setShowWarningDialog] = useState(false);
-  const [estimation, setEstimation] = useState<PivotEstimation | null>(null);
-
   const [page, setPage] = useState(1);
+
+  const prevColumnsRef = useRef<string>("");
+  const prevEstimationRef = useRef<PivotEstimation | null>(null);
+
   const pageSize = 50;
+
+  const estimation = useMemo(() => {
+    if (showRaw || columns.length === 0) {
+      return null;
+    }
+
+    const columnsKey = createColumnsKey(columns);
+
+    if (columnsKey === prevColumnsRef.current && prevEstimationRef.current) {
+      return prevEstimationRef.current;
+    }
+
+    const newEstimation = estimatePivotSize(data, columns, values);
+
+    prevColumnsRef.current = columnsKey;
+    prevEstimationRef.current = newEstimation;
+
+    return newEstimation;
+  }, [columns, data.length, values.length, showRaw]);
 
   useEffect(() => {
     if (showRaw || (!rows.length && !columns.length && !values.length)) {
       setComputationState({ status: "idle", data: null });
-      setEstimation(null);
       return;
     }
 
-    const pivotEstimation = estimatePivotSize(data, columns, values);
-    setEstimation(pivotEstimation);
-
-    if (pivotEstimation.shouldWarn) {
+    if (estimation && estimation.shouldWarn) {
       setComputationState({ status: "awaiting-approval", data: null });
       setShowWarningDialog(true);
     } else {
       performComputation(false);
     }
-  }, [rows, columns, values, data.length, showRaw]);
+  }, [rows, columns, values, data.length, showRaw, estimation?.shouldWarn]);
 
   const performComputation = useCallback(
     (limitColumns: boolean = false) => {
       setComputationState({ status: "computing", data: null });
       setShowWarningDialog(false);
 
-      setTimeout(() => {
+      const computeCallback = () => {
         try {
           let dataToProcess = data;
           let columnLimitInfo = {
@@ -101,6 +120,7 @@ export const PivotTable = () => {
           }
 
           const result = aggregateData(dataToProcess, rows, columns, values);
+
           setComputationState({
             status: "ready",
             data: result,
@@ -116,7 +136,13 @@ export const PivotTable = () => {
               error instanceof Error ? error.message : "Computation failed",
           });
         }
-      }, 100);
+      };
+
+      if (typeof requestIdleCallback !== "undefined") {
+        requestIdleCallback(computeCallback, { timeout: 100 });
+      } else {
+        setTimeout(computeCallback, 50);
+      }
     },
     [data, rows, columns, values, estimation]
   );
@@ -128,7 +154,6 @@ export const PivotTable = () => {
   const handleWarningCancel = useCallback(() => {
     setShowWarningDialog(false);
     setComputationState({ status: "idle", data: null });
-
     revertToPreviousState();
   }, [revertToPreviousState]);
 
@@ -149,14 +174,15 @@ export const PivotTable = () => {
   const { table, grandTotal, rowGroups, colGroups, valueCols, colAggInfo } =
     computationResult;
 
-  const startIdx = (page - 1) * pageSize;
-  const visibleData = useMemo(
-    () => table.slice(startIdx, startIdx + pageSize),
-    [table, startIdx, pageSize]
-  );
+  const visibleData = useMemo(() => {
+    const startIdx = (page - 1) * pageSize;
+    return table.slice(startIdx, startIdx + pageSize);
+  }, [table, page, pageSize]);
 
   const rowSpans = useMemo(() => {
-    if (computationState.status !== "ready" || !visibleData.length) return {};
+    if (computationState.status !== "ready" || visibleData.length === 0) {
+      return {};
+    }
     return computeRowSpans(visibleData, rowGroups);
   }, [visibleData, rowGroups, computationState.status]);
 
@@ -172,11 +198,12 @@ export const PivotTable = () => {
       const cell = rowData[colKey];
 
       if (cell === "-") return "-";
-
       if (!cell || typeof cell !== "object") return null;
+
       const stats = cell as CellStats;
       const aggInfo = colAggInfo[colKey];
       if (!aggInfo) return null;
+
       const { agg } = aggInfo;
       switch (agg) {
         case "sum":
@@ -197,21 +224,6 @@ export const PivotTable = () => {
     },
     [colAggInfo]
   );
-  const subtotalRows = useMemo(() => {
-    if (computationState.status !== "ready" || !visibleData.length) return [];
-    // Find rows marked as subtotal (assuming aggregateData marks them with a property)
-    return visibleData.filter((row: any) => row.__isSubtotal);
-  }, [visibleData, computationState.status]);
-
-  // For debugging: display subtotal rows and rowSpans in console
-  useEffect(() => {
-    if (subtotalRows.length > 0) {
-      console.log("Subtotal Rows:", subtotalRows);
-    }
-    if (rowSpans && Object.keys(rowSpans).length > 0) {
-      console.log("RowSpans:", rowSpans);
-    }
-  }, [subtotalRows, rowSpans]);
 
   if (computationState.status === "awaiting-approval") {
     return (
@@ -236,6 +248,8 @@ export const PivotTable = () => {
                   Too Many Columns
                 </p>
                 <p className="text-xs text-muted-foreground max-w-xs mx-auto">
+                  This configuration will generate{" "}
+                  {estimation?.estimatedColumns.toLocaleString()} columns.
                   Please review the warning dialog.
                 </p>
               </div>
@@ -278,13 +292,10 @@ export const PivotTable = () => {
     );
   }
 
-  // Don't render if in raw mode or no data
-  if (showRaw || !visibleData.length) return null;
+  if (showRaw || visibleData.length === 0) return null;
 
   const hasGrandTotal = grandTotal !== null && rowGroups.length > 0;
   const { columnLimitInfo } = computationState;
-
-  // Check if we only have rows (no columns, no values)
   const hasOnlyRows = rowGroups.length > 0 && leafCols.length === 0;
 
   return (
@@ -307,7 +318,6 @@ export const PivotTable = () => {
           style={{ borderCollapse: "separate", borderSpacing: 0 }}
         >
           <thead className="sticky top-0 z-10 bg-muted">
-            {/* RENDER ROW GROUP HEADERS WHEN ONLY ROWS EXIST */}
             {hasOnlyRows ? (
               <tr>
                 {rowGroups.map((groupName, groupIndex) => (
@@ -320,7 +330,6 @@ export const PivotTable = () => {
                 ))}
               </tr>
             ) : (
-              /* NORMAL HEADER ROWS FOR COLUMNS + VALUES */
               headerRows.map((headerRow, lvl) => (
                 <tr key={`header-row-${lvl}`}>
                   {lvl === 0 &&
@@ -351,7 +360,7 @@ export const PivotTable = () => {
           <tbody>
             {visibleData.map((row, rowIndex) => (
               <PivotTableRow
-                key={`row-${startIdx + rowIndex}`}
+                key={`row-${(page - 1) * pageSize + rowIndex}`}
                 row={row}
                 rowIndex={rowIndex}
                 rowGroups={rowGroups}
@@ -394,7 +403,7 @@ export const PivotTable = () => {
                     <td
                       key={`grandtotal-data-${colIndex}`}
                       className={`px-3 py-2.5 text-center text-xs font-bold border-r border-b border-border min-w-[150px] ${
-                        isNum ? " font-mono" : ""
+                        isNum ? "font-mono" : ""
                       }`}
                     >
                       <span className="truncate block">

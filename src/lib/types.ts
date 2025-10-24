@@ -41,4 +41,5 @@ export interface RowSpanInfo {
 export interface PivotEstimation {
   estimatedColumns: number;
   shouldWarn: boolean;
+  uniqueColumnCombinations: number;
 }

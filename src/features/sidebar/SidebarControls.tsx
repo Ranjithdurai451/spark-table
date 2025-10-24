@@ -2,7 +2,7 @@ import React, { useState } from "react";
 import { cn } from "@/lib/utils";
 import { Database, LayoutDashboard, X, GripVertical } from "lucide-react";
 
-import { usePivotStore } from "@/lib/store/pivot-store";
+import { usePivotStore } from "@/features/table-view/pivot/pivot-store";
 import {
   DndContext,
   DragOverlay,
@@ -86,9 +86,6 @@ export const SidebarControls = ({
       }
       return;
     }
-
-    // REMOVED: Restriction preventing text fields from going to values
-    // Now all fields can be added to values
 
     if (sourceZone === targetZone) {
       return;

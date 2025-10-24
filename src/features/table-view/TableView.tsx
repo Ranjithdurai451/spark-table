@@ -1,4 +1,4 @@
-import { usePivotStore } from "@/lib/store/pivot-store";
+import { usePivotStore } from "@/features/table-view/pivot/pivot-store";
 import { DefaultTable } from "./DefaultTable";
 import { PivotTable } from "./pivot/PivotTable";
 
