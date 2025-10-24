@@ -33,8 +33,12 @@ export const DataPanel = ({ fields }: { fields: string[] }) => {
       const z = getZoneOfField(f);
       if (z) removeFromZone(z, f);
     } else {
-      if (numericFields.includes(f)) addToZone("values", f);
-      else addToZone("rows", f);
+      // All fields can go to values, text fields will get "count" aggregation
+      if (numericFields.includes(f)) {
+        addToZone("values", f);
+      } else {
+        addToZone("rows", f);
+      }
     }
   }
 

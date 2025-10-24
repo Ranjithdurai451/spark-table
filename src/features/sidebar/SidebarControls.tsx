@@ -88,9 +88,8 @@ export const SidebarControls = ({
       return;
     }
 
-    if (targetZone === "values" && !numericFields.includes(field)) {
-      return;
-    }
+    // REMOVED: Restriction preventing text fields from going to values
+    // Now all fields can be added to values
 
     if (sourceZone === targetZone) {
       return;
@@ -393,8 +392,11 @@ function ValuesZoneArea({
 }
 
 function ValueFieldItem({ value }: { value: { field: string; agg: string } }) {
-  const { setValueAgg, removeValueField } = usePivotStore();
+  const { setValueAgg, removeValueField, numericFields } = usePivotStore();
   const dragId = createDragId("values", value.field);
+
+  // Check if field is numeric
+  const isNumeric = numericFields.includes(value.field);
 
   const {
     attributes,
@@ -431,19 +433,28 @@ function ValueFieldItem({ value }: { value: { field: string; agg: string } }) {
         <GripVertical className="h-3 w-3 text-muted-foreground flex-shrink-0" />
       </button>
       <span className="text-xs flex-1 truncate select-none">{value.field}</span>
-      <select
-        className="text-xs h-6 bg-background border border-input rounded px-1.5 cursor-pointer hover:bg-muted/50 transition-colors"
-        value={value.agg}
-        onChange={(e) => setValueAgg(value.field, e.target.value as any)}
-        onClick={(e) => e.stopPropagation()}
-        aria-label={`Aggregation for ${value.field}`}
-      >
-        <option value="sum">Sum</option>
-        <option value="avg">Avg</option>
-        <option value="count">Count</option>
-        <option value="min">Min</option>
-        <option value="max">Max</option>
-      </select>
+
+      {/* Conditional: dropdown for numeric, badge for text */}
+      {isNumeric ? (
+        <select
+          className="text-xs h-6 bg-background border border-input rounded px-1.5 cursor-pointer hover:bg-muted/50 transition-colors"
+          value={value.agg}
+          onChange={(e) => setValueAgg(value.field, e.target.value as any)}
+          onClick={(e) => e.stopPropagation()}
+          aria-label={`Aggregation for ${value.field}`}
+        >
+          <option value="sum">Sum</option>
+          <option value="avg">Avg</option>
+          <option value="count">Count</option>
+          <option value="min">Min</option>
+          <option value="max">Max</option>
+        </select>
+      ) : (
+        <span className="text-xs h-6 bg-muted border border-input rounded px-2 flex items-center text-muted-foreground select-none">
+          Count
+        </span>
+      )}
+
       <button
         type="button"
         className="text-muted-foreground hover:text-foreground opacity-0 group-hover:opacity-100 transition-opacity p-0.5 -mr-0.5 hover:bg-destructive/10 rounded"

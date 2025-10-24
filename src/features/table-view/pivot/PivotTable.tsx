@@ -1,6 +1,6 @@
-import { useMemo, useState, useEffect, memo, useRef, useCallback } from "react";
+import { useMemo, useState, useEffect, useCallback } from "react";
 import { usePivotStore } from "@/lib/store/pivot-store";
-import { Pagination } from "./Pagination";
+import { Pagination } from "../Pagination";
 import { PivotWarningDialog } from "./PivotWarningDialog";
 import { AlertTriangle, Info } from "lucide-react";
 import {
@@ -9,11 +9,13 @@ import {
   aggregateData,
   estimatePivotSize,
   limitColumnsForRendering,
-  type AggregateDataResult,
-  type PivotEstimation,
-  type CellStats,
-  type RowSpanInfo,
 } from "./pivot-operations";
+import type {
+  AggregateDataResult,
+  CellStats,
+  PivotEstimation,
+} from "@/lib/types";
+import { PivotTableRow } from "./PivotTableRow";
 
 interface ComputationState {
   status: "idle" | "awaiting-approval" | "computing" | "ready" | "error";
@@ -25,126 +27,6 @@ interface ComputationState {
     displayedColumns: number;
   };
 }
-
-const TableRow = memo(
-  ({
-    row,
-    rowIndex,
-    rowGroups,
-    rowSpans,
-    leafCols,
-    colAggInfo,
-  }: {
-    row: any;
-    rowIndex: number;
-    rowGroups: string[];
-    rowSpans: Record<number, RowSpanInfo[]>;
-    leafCols: string[];
-    colAggInfo: Record<string, { field: string; agg: string }>;
-  }) => {
-    const isSubtotal = row.__isSubtotal || false;
-    const subtotalLevel = row.__subtotalLevel ?? -1;
-
-    const getAggValue = useCallback(
-      (rowData: any, colKey: string): number | null => {
-        const cell = rowData[colKey];
-        if (!cell || typeof cell !== "object") return null;
-        const stats = cell as CellStats;
-        const aggInfo = colAggInfo[colKey];
-        if (!aggInfo) return null;
-        const { agg } = aggInfo;
-        switch (agg) {
-          case "sum":
-            return stats.sum ?? null;
-          case "count":
-            return stats.rawCount;
-          case "avg":
-            return stats.validCount > 0
-              ? (stats.sum ?? 0) / stats.validCount
-              : null;
-          case "min":
-            return stats.min ?? null;
-          case "max":
-            return stats.max ?? null;
-          default:
-            return null;
-        }
-      },
-      [colAggInfo]
-    );
-
-    return (
-      <tr
-        className={`group transition-colors ${
-          isSubtotal ? "bg-muted/30" : "bg-background"
-        } `}
-      >
-        {rowGroups.map((col, groupIndex) => {
-          const spanInfo = rowSpans[rowIndex]?.[groupIndex];
-
-          if (!spanInfo || spanInfo.span === 0) return null;
-
-          if (isSubtotal && groupIndex > subtotalLevel) {
-            return null;
-          }
-
-          let colSpan = 1;
-          if (isSubtotal) {
-            colSpan = rowGroups.length - groupIndex;
-          }
-
-          const cellValue = row[col];
-          const displayValue =
-            cellValue !== undefined && cellValue !== null && cellValue !== ""
-              ? String(cellValue)
-              : "—";
-
-          return (
-            <td
-              key={`row-${rowIndex}-group-${groupIndex}`}
-              rowSpan={spanInfo.span || 1}
-              colSpan={colSpan}
-              className={`px-3 py-2 text-xs border-r border-b border-border min-w-[200px] max-w-[200px] ${
-                isSubtotal
-                  ? "font-semibold text-foreground text-left"
-                  : "font-medium text-center"
-              }`}
-            >
-              <span className="truncate block">{displayValue}</span>
-            </td>
-          );
-        })}
-
-        {leafCols.map((col, colIndex) => {
-          const value = getAggValue(row, col);
-          const isNum = typeof value === "number" && isFinite(value);
-          const isEmpty =
-            value === null || value === undefined || !isFinite(value);
-
-          return (
-            <td
-              key={`cell-${rowIndex}-data-${colIndex}`}
-              className={`px-3 py-2 text-center text-xs transition-colors border-r border-b border-border min-w-[150px] ${
-                isNum ? " font-mono" : ""
-              } ${isSubtotal ? "font-semibold" : ""}`}
-            >
-              <span className="truncate block">
-                {isEmpty
-                  ? "-"
-                  : value!.toLocaleString(undefined, {
-                      maximumFractionDigits: 2,
-                      minimumFractionDigits: 0,
-                    })}
-              </span>
-            </td>
-          );
-        })}
-      </tr>
-    );
-  }
-);
-
-TableRow.displayName = "TableRow";
 
 export const PivotTable = () => {
   const data = usePivotStore((state) => state.data);
@@ -164,28 +46,15 @@ export const PivotTable = () => {
   const [showWarningDialog, setShowWarningDialog] = useState(false);
   const [estimation, setEstimation] = useState<PivotEstimation | null>(null);
 
-  const lastConfigRef = useRef<string>("");
   const [page, setPage] = useState(1);
   const pageSize = 50;
-
-  const configKey = useMemo(
-    () => JSON.stringify({ rows, columns, values, dataLength: data.length }),
-    [rows, columns, values, data.length]
-  );
 
   useEffect(() => {
     if (showRaw || (!rows.length && !columns.length && !values.length)) {
       setComputationState({ status: "idle", data: null });
       setEstimation(null);
-      lastConfigRef.current = "";
       return;
     }
-
-    if (configKey === lastConfigRef.current) {
-      return;
-    }
-
-    lastConfigRef.current = configKey;
 
     const pivotEstimation = estimatePivotSize(data, columns, values);
     setEstimation(pivotEstimation);
@@ -196,7 +65,7 @@ export const PivotTable = () => {
     } else {
       performComputation(false);
     }
-  }, [configKey, showRaw]);
+  }, [rows, columns, values, data.length, showRaw]);
 
   const performComputation = useCallback(
     (limitColumns: boolean = false) => {
@@ -212,14 +81,12 @@ export const PivotTable = () => {
             displayedColumns: 0,
           };
 
-          // Apply column limiting if user proceeded with warning
           if (limitColumns && estimation && estimation.shouldWarn) {
             const { limitedData, columnsLimited, originalColumns } =
               limitColumnsForRendering(data, columns, 200);
 
             dataToProcess = limitedData;
 
-            // Recalculate estimated columns with limited data
             const newEstimation = estimatePivotSize(
               limitedData,
               columns,
@@ -263,8 +130,6 @@ export const PivotTable = () => {
     setComputationState({ status: "idle", data: null });
 
     revertToPreviousState();
-
-    lastConfigRef.current = "";
   }, [revertToPreviousState]);
 
   const computationResult = useMemo(
@@ -303,8 +168,11 @@ export const PivotTable = () => {
   }, [valueCols, colGroups, computationState.status]);
 
   const getAggValue = useCallback(
-    (rowData: any, colKey: string): number | null => {
+    (rowData: any, colKey: string): number | string | null => {
       const cell = rowData[colKey];
+
+      if (cell === "-") return "-";
+
       if (!cell || typeof cell !== "object") return null;
       const stats = cell as CellStats;
       const aggInfo = colAggInfo[colKey];
@@ -329,6 +197,21 @@ export const PivotTable = () => {
     },
     [colAggInfo]
   );
+  const subtotalRows = useMemo(() => {
+    if (computationState.status !== "ready" || !visibleData.length) return [];
+    // Find rows marked as subtotal (assuming aggregateData marks them with a property)
+    return visibleData.filter((row: any) => row.__isSubtotal);
+  }, [visibleData, computationState.status]);
+
+  // For debugging: display subtotal rows and rowSpans in console
+  useEffect(() => {
+    if (subtotalRows.length > 0) {
+      console.log("Subtotal Rows:", subtotalRows);
+    }
+    if (rowSpans && Object.keys(rowSpans).length > 0) {
+      console.log("RowSpans:", rowSpans);
+    }
+  }, [subtotalRows, rowSpans]);
 
   if (computationState.status === "awaiting-approval") {
     return (
@@ -395,14 +278,17 @@ export const PivotTable = () => {
     );
   }
 
-  if (showRaw || (!visibleData.length && !leafCols.length)) return null;
+  // Don't render if in raw mode or no data
+  if (showRaw || !visibleData.length) return null;
 
   const hasGrandTotal = grandTotal !== null && rowGroups.length > 0;
   const { columnLimitInfo } = computationState;
 
+  // Check if we only have rows (no columns, no values)
+  const hasOnlyRows = rowGroups.length > 0 && leafCols.length === 0;
+
   return (
-    <div className="w-full h-full flex flex-col  overflow-hidden bg-background border border-border">
-      {/* Column Limit Warning Banner */}
+    <div className="w-full h-full flex flex-col overflow-hidden bg-background border border-border">
       {columnLimitInfo?.limited && (
         <div className="bg-yellow-500/10 border-b border-yellow-500/20 px-4 py-2 flex items-center gap-2">
           <Info className="h-4 w-4 text-yellow-600 flex-shrink-0" />
@@ -421,35 +307,50 @@ export const PivotTable = () => {
           style={{ borderCollapse: "separate", borderSpacing: 0 }}
         >
           <thead className="sticky top-0 z-10 bg-muted">
-            {headerRows.map((headerRow, lvl) => (
-              <tr key={`header-row-${lvl}`}>
-                {lvl === 0 &&
-                  rowGroups.map((groupName, groupIndex) => (
-                    <th
-                      key={`header-rowgroup-${groupIndex}`}
-                      rowSpan={headerRows.length}
-                      className="px-3 py-2 text-xs font-semibold bg-muted text-muted-foreground border-r border-b border-border min-w-[200px] max-w-[200px] uppercase"
-                    >
-                      <span className="truncate block">{groupName}</span>
-                    </th>
-                  ))}
-
-                {headerRow.map((cell, cellIndex) => (
+            {/* RENDER ROW GROUP HEADERS WHEN ONLY ROWS EXIST */}
+            {hasOnlyRows ? (
+              <tr>
+                {rowGroups.map((groupName, groupIndex) => (
                   <th
-                    key={`header-${lvl}-${cellIndex}`}
-                    colSpan={cell.colSpan}
-                    className="px-3 py-2 text-xs font-semibold bg-muted text-muted-foreground border-r border-b border-border min-w-[150px] uppercase"
+                    key={`header-rowgroup-${groupIndex}`}
+                    className="px-3 py-2 text-xs font-semibold bg-muted text-muted-foreground border-r border-b border-border min-w-[200px] max-w-[200px] uppercase"
                   >
-                    <span className="truncate block">{cell.label}</span>
+                    <span className="truncate block">{groupName}</span>
                   </th>
                 ))}
               </tr>
-            ))}
+            ) : (
+              /* NORMAL HEADER ROWS FOR COLUMNS + VALUES */
+              headerRows.map((headerRow, lvl) => (
+                <tr key={`header-row-${lvl}`}>
+                  {lvl === 0 &&
+                    rowGroups.map((groupName, groupIndex) => (
+                      <th
+                        key={`header-rowgroup-${groupIndex}`}
+                        rowSpan={headerRows.length}
+                        className="px-3 py-2 text-xs font-semibold bg-muted text-muted-foreground border-r border-b border-border min-w-[200px] max-w-[200px] uppercase"
+                      >
+                        <span className="truncate block">{groupName}</span>
+                      </th>
+                    ))}
+
+                  {headerRow.map((cell, cellIndex) => (
+                    <th
+                      key={`header-${lvl}-${cellIndex}`}
+                      colSpan={cell.colSpan}
+                      className="px-3 py-2 text-xs font-semibold bg-muted text-muted-foreground border-r border-b border-border min-w-[150px] uppercase"
+                    >
+                      <span className="truncate block">{cell.label}</span>
+                    </th>
+                  ))}
+                </tr>
+              ))
+            )}
           </thead>
 
           <tbody>
             {visibleData.map((row, rowIndex) => (
-              <TableRow
+              <PivotTableRow
                 key={`row-${startIdx + rowIndex}`}
                 row={row}
                 rowIndex={rowIndex}
@@ -482,9 +383,12 @@ export const PivotTable = () => {
 
                 {leafCols.map((col, colIndex) => {
                   const value = getAggValue(grandTotal, col);
+                  const isPlaceholder = value === "-";
                   const isNum = typeof value === "number" && isFinite(value);
                   const isEmpty =
-                    value === null || value === undefined || !isFinite(value);
+                    value === null ||
+                    value === undefined ||
+                    (!isNum && !isPlaceholder);
 
                   return (
                     <td
@@ -496,10 +400,14 @@ export const PivotTable = () => {
                       <span className="truncate block">
                         {isEmpty
                           ? "—"
-                          : value!.toLocaleString(undefined, {
+                          : isPlaceholder
+                          ? "-"
+                          : isNum
+                          ? (value as number).toLocaleString(undefined, {
                               maximumFractionDigits: 2,
                               minimumFractionDigits: 0,
-                            })}
+                            })
+                          : String(value)}
                       </span>
                     </td>
                   );

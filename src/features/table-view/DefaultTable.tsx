@@ -1,9 +1,4 @@
 import { useMemo, useState } from "react";
-import {
-  flexRender,
-  getCoreRowModel,
-  useReactTable,
-} from "@tanstack/react-table";
 import { usePivotStore } from "@/lib/store/pivot-store";
 import { Pagination } from "./Pagination";
 
@@ -12,28 +7,14 @@ export const DefaultTable = () => {
   const fields = usePivotStore((state) => state.fields);
 
   const [page, setPage] = useState(1);
-  const pageSize = 40;
+  const pageSize = 50;
 
-  const columns = useMemo(
-    () =>
-      fields.map((f) => ({
-        accessorKey: f,
-        header: f,
-        cell: (ctx: any) => String(ctx.getValue() ?? ""),
-      })),
-    [fields]
-  );
-
-  const table = useReactTable({
-    data,
-    columns,
-    getCoreRowModel: getCoreRowModel(),
-  });
-
-  const { rows } = table.getRowModel();
-  const totalRows = rows.length;
+  const totalRows = data.length;
   const startIdx = (page - 1) * pageSize;
-  const pagedRows = rows.slice(startIdx, startIdx + pageSize);
+  const pagedData = useMemo(
+    () => data.slice(startIdx, startIdx + pageSize),
+    [data, startIdx]
+  );
 
   if (data.length === 0) return null;
 
@@ -42,37 +23,32 @@ export const DefaultTable = () => {
       <div className="flex-1 min-h-0 overflow-auto scrollbar-thin">
         <table className="w-full border-collapse">
           <thead className="sticky top-0 z-10">
-            {table.getHeaderGroups().map((headerGroup) => (
-              <tr key={headerGroup.id}>
-                {headerGroup.headers.map((header) => (
-                  <th
-                    key={header.id}
-                    className="px-3 py-2 text-left border-b border-r border-border  bg-muted font-semibold text-xs uppercase tracking-wide last:border-r-0"
-                    style={{
-                      whiteSpace: "nowrap",
-                      letterSpacing: "0.01em",
-                    }}
-                  >
-                    {flexRender(
-                      header.column.columnDef.header,
-                      header.getContext()
-                    )}
-                  </th>
-                ))}
-              </tr>
-            ))}
+            <tr>
+              {fields.map((field) => (
+                <th
+                  key={field}
+                  className="px-3 py-2 text-left border-b border-r border-border bg-muted font-semibold text-xs uppercase tracking-wide last:border-r-0"
+                  style={{
+                    whiteSpace: "nowrap",
+                    letterSpacing: "0.01em",
+                  }}
+                >
+                  {field}
+                </th>
+              ))}
+            </tr>
           </thead>
           <tbody>
-            {pagedRows.map((row, i) => (
+            {pagedData.map((row, i) => (
               <tr
-                key={row.id}
+                key={i}
                 className={`transition-colors hover:bg-accent/30 ${
                   i % 2 ? "bg-muted/[0.028]" : ""
                 }`}
               >
-                {row.getVisibleCells().map((cell) => (
+                {fields.map((field) => (
                   <td
-                    key={cell.id}
+                    key={field}
                     className="px-3 py-2 text-xs border-b border-r border-border last:border-r-0"
                     style={{
                       maxWidth: "256px",
@@ -81,7 +57,7 @@ export const DefaultTable = () => {
                       textOverflow: "ellipsis",
                     }}
                   >
-                    {flexRender(cell.column.columnDef.cell, cell.getContext())}
+                    {String(row[field] ?? "")}
                   </td>
                 ))}
               </tr>

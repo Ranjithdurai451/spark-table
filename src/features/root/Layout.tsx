@@ -96,7 +96,8 @@ export default function Layout() {
             )}
           </div>
         </div>
-        <div className="hidden lg:block flex-shrink-0">
+        <div className="flex-shrink-0">
+          {/* <div className="hidden lg:block flex-shrink-0"> */}
           <SidebarControls fields={usePivotStore.getState().fields} />
         </div>
       </section>
