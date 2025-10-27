@@ -7,8 +7,8 @@ import type {
   AggregateDataResult,
 } from "@/lib/types";
 
-const COLUMN_WARNING_THRESHOLD = 200;
-const MAX_RENDER_COLUMNS = 200;
+const COLUMN_WARNING_THRESHOLD = 1000;
+const MAX_RENDER_COLUMNS = 1000;
 
 export function computeCellStats(rows: any[], field: string): CellStats {
   const rowCount = rows.length;

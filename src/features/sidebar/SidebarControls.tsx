@@ -49,7 +49,7 @@ export const SidebarControls = ({
     addToZone,
     moveBetweenZones,
     removeFromZone,
-    getZoneOfField,
+    getFieldZone,
     clearZone,
   } = usePivotStore();
 
@@ -80,7 +80,7 @@ export const SidebarControls = ({
     const targetZone = over.id as "rows" | "columns" | "values" | "data-panel";
 
     if (targetZone === "data-panel") {
-      const existingZone = getZoneOfField(field);
+      const existingZone = getFieldZone(field);
       if (existingZone) {
         removeFromZone(existingZone as "rows" | "columns" | "values", field);
       }
@@ -92,7 +92,7 @@ export const SidebarControls = ({
     }
 
     if (sourceZone === "data") {
-      const existingZone = getZoneOfField(field);
+      const existingZone = getFieldZone(field);
       if (existingZone) {
         if (existingZone !== targetZone) {
           moveBetweenZones(

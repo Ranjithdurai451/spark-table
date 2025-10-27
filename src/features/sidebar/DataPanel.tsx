@@ -10,13 +10,13 @@ import { createDragId } from "./SidebarControls";
 
 export const DataPanel = ({ fields }: { fields: string[] }) => {
   const {
-    hasFieldAnywhere,
+    getFieldZone,
     addToZone,
     removeFromZone,
     numericFields,
     showRaw,
     setShowRaw,
-    getZoneOfField,
+    clearZone,
   } = usePivotStore();
   const [q, setQ] = useState("");
   const filtered = useMemo(
@@ -29,9 +29,9 @@ export const DataPanel = ({ fields }: { fields: string[] }) => {
   });
 
   function toggleField(f: string) {
-    if (hasFieldAnywhere(f)) {
-      const z = getZoneOfField(f);
-      if (z) removeFromZone(z, f);
+    const z = getFieldZone(f);
+    if (z) {
+      removeFromZone(z, f);
     } else {
       // All fields can go to values, text fields will get "count" aggregation
       if (numericFields.includes(f)) {
@@ -43,15 +43,10 @@ export const DataPanel = ({ fields }: { fields: string[] }) => {
   }
 
   function clearAllFields() {
-    fields.forEach((f) => {
-      if (hasFieldAnywhere(f)) {
-        const z = getZoneOfField(f);
-        if (z) removeFromZone(z, f);
-      }
-    });
+    clearZone("data");
   }
 
-  const hasActiveFields = fields.some((f) => hasFieldAnywhere(f));
+  const hasActiveFields = fields.some((f) => getFieldZone(f));
 
   return (
     <div className="flex h-full flex-col gap-3">
@@ -64,7 +59,11 @@ export const DataPanel = ({ fields }: { fields: string[] }) => {
           <button
             type="button"
             className="text-xs text-destructive hover:text-destructive/80 cursor-pointer select-none text-right"
-            onClick={clearAllFields}
+            onClick={(e) => {
+              e.preventDefault();
+              e.stopPropagation();
+              clearAllFields();
+            }}
             aria-label="Clear all fields"
             title="Clear all fields"
           >
@@ -107,7 +106,7 @@ export const DataPanel = ({ fields }: { fields: string[] }) => {
             <DataFieldItem
               key={f}
               field={f}
-              isActive={hasFieldAnywhere(f)}
+              isActive={!!getFieldZone(f)}
               isNumeric={numericFields.includes(f)}
               onToggle={() => toggleField(f)}
             />

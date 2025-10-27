@@ -43,3 +43,7 @@ export interface PivotEstimation {
   shouldWarn: boolean;
   uniqueColumnCombinations: number;
 }
+
+export type Agg = "sum" | "avg" | "count" | "min" | "max";
+export type Zone = "rows" | "columns" | "values" | "data";
+export type ValueItem = { field: string; agg: Agg };

@@ -1,5 +1,6 @@
-import type { RowSpanInfo, CellStats } from "@/lib/types";
-import { memo, useCallback } from "react";
+import { memo } from "react";
+import type { RowSpanInfo } from "@/lib/types";
+import { getAggValue } from "./helpers";
 
 export const PivotTableRow = memo(
   ({
@@ -20,37 +21,6 @@ export const PivotTableRow = memo(
     const isSubtotal = row.__isSubtotal || false;
     const subtotalLevel = row.__subtotalLevel ?? -1;
 
-    const getAggValue = useCallback(
-      (rowData: any, colKey: string): number | string | null => {
-        const cell = rowData[colKey];
-
-        if (cell === "-") return "-";
-
-        if (!cell || typeof cell !== "object") return null;
-        const stats = cell as CellStats;
-        const aggInfo = colAggInfo[colKey];
-        if (!aggInfo) return null;
-        const { agg } = aggInfo;
-        switch (agg) {
-          case "sum":
-            return stats.sum ?? null;
-          case "count":
-            return stats.rawCount;
-          case "avg":
-            return stats.validCount > 0
-              ? (stats.sum ?? 0) / stats.validCount
-              : null;
-          case "min":
-            return stats.min ?? null;
-          case "max":
-            return stats.max ?? null;
-          default:
-            return null;
-        }
-      },
-      [colAggInfo]
-    );
-
     return (
       <tr
         className={`group transition-colors ${
@@ -59,39 +29,27 @@ export const PivotTableRow = memo(
       >
         {rowGroups.map((col, groupIndex) => {
           const spanInfo = rowSpans[rowIndex]?.[groupIndex];
-
-          // Skip rendering if no span info or span is 0
           if (!spanInfo || spanInfo.span === 0) return null;
 
-          // For subtotal rows: handle differently based on level
           if (isSubtotal) {
-            // Skip cells before the subtotal level
-            if (groupIndex < subtotalLevel) {
-              return null;
-            }
-
-            // At the subtotal level: show "Total X" and span remaining columns
+            if (groupIndex < subtotalLevel) return null;
             if (groupIndex === subtotalLevel) {
               const colSpan = rowGroups.length - subtotalLevel;
               const displayValue = row.__subtotalLabel || "Total";
-
               return (
                 <td
                   key={`row-${rowIndex}-group-${groupIndex}`}
                   rowSpan={1}
                   colSpan={colSpan - 1}
-                  className="px-3 py-2 text-xs border-r border-b border-border min-w-[200px] font-semibold text-foreground text-left"
+                  className="px-3 py-2 text-xs border-r border-b border-border min-w-[200px] font-semibold text-left"
                 >
                   <span className="truncate block">{displayValue}</span>
                 </td>
               );
             }
-
-            // ✅ FIXED: Skip ALL cells after subtotal level (covered by colspan)
             return null;
           }
 
-          // Regular rows: normal rendering
           const cellValue = row[col];
           const displayValue =
             cellValue !== undefined && cellValue !== null && cellValue !== ""
@@ -103,7 +61,7 @@ export const PivotTableRow = memo(
               key={`row-${rowIndex}-group-${groupIndex}`}
               rowSpan={spanInfo.span || 1}
               colSpan={1}
-              className="px-3 py-2 text-xs border-r border-b border-border min-w-[200px] max-w-[200px] font-medium text-center"
+              className="px-3 py-2 text-xs border-r border-b border-border min-w-[200px] text-center"
             >
               <span className="truncate block">{displayValue}</span>
             </td>
@@ -111,7 +69,7 @@ export const PivotTableRow = memo(
         })}
 
         {leafCols.map((col, colIndex) => {
-          const value = getAggValue(row, col);
+          const value = getAggValue(row, col, colAggInfo);
           const isPlaceholder = value === "-";
           const isNum = typeof value === "number" && isFinite(value);
           const isEmpty =
@@ -120,14 +78,12 @@ export const PivotTableRow = memo(
           return (
             <td
               key={`cell-${rowIndex}-data-${colIndex}`}
-              className={`px-3 py-2 text-center text-xs transition-colors border-r border-b border-border min-w-[150px] ${
-                isNum ? " font-mono" : ""
+              className={`px-3 py-2 text-center text-xs border-r border-b border-border min-w-[150px] ${
+                isNum ? "font-mono" : ""
               } ${isSubtotal ? "font-semibold" : ""}`}
             >
               <span className="truncate block">
                 {isEmpty
-                  ? "-"
-                  : isPlaceholder
                   ? "-"
                   : isNum
                   ? (value as number).toLocaleString(undefined, {
