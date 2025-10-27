@@ -2,7 +2,7 @@ import React, { useState } from "react";
 import { cn } from "@/lib/utils";
 import { Database, LayoutDashboard, X, GripVertical } from "lucide-react";
 
-import { usePivotStore } from "@/features/table-view/pivot/pivot-store";
+import { usePivotStore } from "@/features/table-view/pivot-table/store/pivot-store";
 import {
   DndContext,
   DragOverlay,

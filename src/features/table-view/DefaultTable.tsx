@@ -1,5 +1,5 @@
 import { useMemo, useState } from "react";
-import { usePivotStore } from "@/features/table-view/pivot/pivot-store";
+import { usePivotStore } from "@/features/table-view/pivot-table/store/pivot-store";
 import { Pagination } from "./Pagination";
 
 export const DefaultTable = () => {

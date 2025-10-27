@@ -1,6 +1,6 @@
 import { Button } from "@/components/ui/button";
 import { UploadDialog } from "../upload/UploadDialog";
-import { usePivotStore } from "@/features/table-view/pivot/pivot-store";
+import { usePivotStore } from "@/features/table-view/pivot-table/store/pivot-store";
 import { useState } from "react";
 import { SidebarControls } from "../sidebar/SidebarControls";
 import { TableView } from "../table-view/TableView";

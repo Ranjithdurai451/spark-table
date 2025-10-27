@@ -1,6 +1,6 @@
 import { memo } from "react";
 import type { RowSpanInfo } from "@/lib/types";
-import { getAggValue } from "./helpers";
+import { getAggValue } from "../core/pivot-helpers";
 
 export const PivotTableRow = memo(
   ({

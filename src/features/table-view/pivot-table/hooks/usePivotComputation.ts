@@ -1,11 +1,11 @@
 import { useState, useCallback, useRef, useMemo } from "react";
+import { usePivotStore } from "@/features/table-view/pivot-table/store/pivot-store";
+import type { AggregateDataResult, PivotEstimation } from "@/lib/types";
+import { aggregateData } from "../core/pivot-aggregation";
 import {
-  aggregateData,
   estimatePivotSize,
   limitColumnsForRendering,
-} from "./pivot-operations";
-import { usePivotStore } from "@/features/table-view/pivot/pivot-store";
-import type { AggregateDataResult, PivotEstimation } from "@/lib/types";
+} from "../core/pivot-size-estimation";
 
 export const usePivotComputation = () => {
   const { data, rows, columns, values, showRaw, revertToPreviousState } =

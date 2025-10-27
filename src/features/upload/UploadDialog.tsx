@@ -7,7 +7,7 @@ import {
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import * as XLSX from "xlsx";
-import { usePivotStore } from "@/features/table-view/pivot/pivot-store";
+import { usePivotStore } from "@/features/table-view/pivot-table/store/pivot-store";
 import { useRef, useState } from "react";
 
 export const UploadDialog = ({

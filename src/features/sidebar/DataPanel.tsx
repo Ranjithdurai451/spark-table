@@ -1,6 +1,6 @@
 import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
-import { usePivotStore } from "@/features/table-view/pivot/pivot-store";
+import { usePivotStore } from "@/features/table-view/pivot-table/store/pivot-store";
 import { cn } from "@/lib/utils";
 import { useDraggable, useDroppable } from "@dnd-kit/core";
 import { Separator } from "@radix-ui/react-dropdown-menu";

@@ -4,7 +4,7 @@ import {
   inferFields,
   inferFieldsMetadata,
   removeFieldFromAllZones,
-} from "./helpers";
+} from "../core/pivot-helpers";
 export type PivotState = {
   data: any[];
   fields: string[];

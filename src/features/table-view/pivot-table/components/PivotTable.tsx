@@ -1,14 +1,14 @@
 import { useState, useEffect, useCallback } from "react";
-import { usePivotStore } from "@/features/table-view/pivot/pivot-store";
-import { Pagination } from "../Pagination";
+import { usePivotStore } from "@/features/table-view/pivot-table/store/pivot-store";
+import { Pagination } from "../../Pagination";
 import { PivotWarningDialog } from "./PivotWarningDialog";
 import { Info } from "lucide-react";
-import { computeRowSpans, buildColHeaderTree } from "./pivot-operations";
-import { usePivotComputation } from "./usePivotComputation";
-import { PivotTableRow } from "./PivotTableRow";
+import { usePivotComputation } from "../hooks/usePivotComputation";
 import { PivotLoading } from "./PivotLoading";
 import { PivotError } from "./PivotError";
-import { getAggValue } from "./helpers";
+import { getAggValue } from "../core/pivot-helpers";
+import { computeRowSpans, buildColHeaderTree } from "../core/pivot-grouping";
+import { PivotTableRow } from "./PivotTableRow";
 
 export const PivotTable = () => {
   const { rows, columns, values, showRaw } = usePivotStore();
