@@ -165,7 +165,7 @@ function DataFieldItem({
 
       <span className="flex-1 truncate">{field}</span>
       <span className="text-[10px] text-muted-foreground">
-        {isNumeric ? "num" : "text"}
+        {isNumeric ? "int" : "string"}
       </span>
 
       <Checkbox

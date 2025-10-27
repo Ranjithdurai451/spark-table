@@ -113,10 +113,10 @@ export function estimatePivotSize(
     };
   }
 
+  // Sample the data to find unique column combinations
   const sampleSize = Math.min(data.length, 10000);
   const seen = new Set<string>();
   const colsLen = cols.length;
-
   const keyParts = new Array(colsLen);
 
   for (let i = 0; i < sampleSize; i++) {
@@ -128,9 +128,10 @@ export function estimatePivotSize(
         val === null || val === undefined ? "__NULL__" : String(val);
     }
 
-    const key = keyParts.join("||");
+    const key = keyParts.join("|||");
     seen.add(key);
 
+    // Early exit if we already exceed threshold
     if (seen.size > COLUMN_WARNING_THRESHOLD) {
       break;
     }
@@ -138,11 +139,15 @@ export function estimatePivotSize(
 
   const uniqueColCombos = seen.size;
 
+  // Extrapolate to full dataset if we sampled
   const estimatedUniqueCombos =
     sampleSize < data.length
       ? Math.ceil((uniqueColCombos / sampleSize) * data.length)
       : uniqueColCombos;
 
+  // Calculate final column count
+  // If we have values, each unique combo gets multiplied by number of values
+  // If no values, each unique combo is just a presence indicator ("-")
   const valueCount = values?.length ?? 0;
   const estimatedColumns =
     valueCount > 0 ? estimatedUniqueCombos * valueCount : estimatedUniqueCombos;
@@ -157,58 +162,76 @@ export function estimatePivotSize(
 export function limitColumnsForRendering(
   data: any[],
   cols: string[],
+  values: AggregationValue[] = [],
   maxColumns: number = MAX_RENDER_COLUMNS
-): { limitedData: any[]; columnsLimited: boolean; originalColumns: number } {
+): {
+  limitedData: any[];
+  columnsLimited: boolean;
+  originalColumns: number;
+  keptValues: Set<string>;
+} {
   if (!cols.length || data.length === 0) {
-    return { limitedData: data, columnsLimited: false, originalColumns: 0 };
-  }
-
-  const firstColField = cols[0];
-  const uniqueValues = new Set<any>();
-
-  for (let i = 0; i < data.length; i++) {
-    uniqueValues.add(data[i][firstColField] ?? "N/A");
-  }
-
-  const firstColUniqueCount = uniqueValues.size;
-
-  let otherColsCombos = 1;
-  if (cols.length > 1) {
-    const otherColsValues = new Set<string>();
-    for (let i = 0; i < Math.min(data.length, 5000); i++) {
-      const parts: string[] = [];
-      for (let c = 1; c < cols.length; c++) {
-        parts.push(String(data[i][cols[c]] ?? "N/A"));
-      }
-      otherColsValues.add(parts.join("||"));
-    }
-    otherColsCombos = otherColsValues.size;
-  }
-
-  const totalCombos = firstColUniqueCount * otherColsCombos;
-
-  if (totalCombos <= maxColumns) {
     return {
       limitedData: data,
       columnsLimited: false,
-      originalColumns: totalCombos,
+      originalColumns: 0,
+      keptValues: new Set(),
     };
   }
 
-  const maxFirstColValues = Math.ceil(maxColumns / otherColsCombos);
-  const limitedValues = Array.from(uniqueValues)
-    .sort((a, b) => String(a).localeCompare(String(b)))
-    .slice(0, Math.max(10, maxFirstColValues));
+  const hasValues = values && values.length > 0;
+  const valueCount = hasValues ? values.length : 1; // 1 for presence indicator
 
-  const limitedValuesSet = new Set(limitedValues);
-  const limitedData = data.filter((row) =>
-    limitedValuesSet.has(row[firstColField] ?? "N/A")
-  );
+  // First, determine unique column combinations across ALL column dimensions
+  const colKeysSet = new Set<string>();
+  const colsLen = cols.length;
+
+  for (let i = 0; i < data.length; i++) {
+    const row = data[i];
+    const keyParts: string[] = new Array(colsLen);
+
+    for (let c = 0; c < colsLen; c++) {
+      keyParts[c] = String(row[cols[c]] ?? "N/A");
+    }
+
+    colKeysSet.add(keyParts.join("|||"));
+  }
+
+  const uniqueCombos = colKeysSet.size;
+  const totalColumns = uniqueCombos * valueCount;
+
+  // If we're under the limit, no need to filter
+  if (totalColumns <= maxColumns) {
+    return {
+      limitedData: data,
+      columnsLimited: false,
+      originalColumns: totalColumns,
+      keptValues: new Set(Array.from(colKeysSet)),
+    };
+  }
+
+  // We need to limit - keep the first N column combinations
+  const maxCombos = Math.floor(maxColumns / valueCount);
+  const sortedKeys = Array.from(colKeysSet).sort();
+  const limitedKeys = sortedKeys.slice(0, Math.max(10, maxCombos));
+  const limitedKeysSet = new Set(limitedKeys);
+
+  // Filter data to only include rows that match our limited column combinations
+  const limitedData = data.filter((row) => {
+    const keyParts: string[] = new Array(colsLen);
+
+    for (let c = 0; c < colsLen; c++) {
+      keyParts[c] = String(row[cols[c]] ?? "N/A");
+    }
+
+    return limitedKeysSet.has(keyParts.join("|||"));
+  });
 
   return {
     limitedData,
     columnsLimited: true,
-    originalColumns: totalCombos,
+    originalColumns: totalColumns,
+    keptValues: limitedKeysSet,
   };
 }
 

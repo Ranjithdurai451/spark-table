@@ -49,28 +49,40 @@ export const PivotTable = () => {
   const [page, setPage] = useState(1);
 
   const prevColumnsRef = useRef<string>("");
+  const prevValuesRef = useRef<string>("");
   const prevEstimationRef = useRef<PivotEstimation | null>(null);
 
   const pageSize = 50;
+
+  // Create stable keys for memoization
+  const columnsKey = useMemo(() => createColumnsKey(columns), [columns]);
+  const valuesKey = useMemo(
+    () => values.map((v) => `${v.field}:${v.agg}`).join("|||"),
+    [values]
+  );
 
   const estimation = useMemo(() => {
     if (showRaw || columns.length === 0) {
       return null;
     }
 
-    const columnsKey = createColumnsKey(columns);
-
-    if (columnsKey === prevColumnsRef.current && prevEstimationRef.current) {
+    // Check if we can use cached estimation
+    if (
+      columnsKey === prevColumnsRef.current &&
+      valuesKey === prevValuesRef.current &&
+      prevEstimationRef.current
+    ) {
       return prevEstimationRef.current;
     }
 
     const newEstimation = estimatePivotSize(data, columns, values);
 
     prevColumnsRef.current = columnsKey;
+    prevValuesRef.current = valuesKey;
     prevEstimationRef.current = newEstimation;
 
     return newEstimation;
-  }, [columns, data.length, values.length, showRaw]);
+  }, [columnsKey, valuesKey, data.length, showRaw]);
 
   useEffect(() => {
     if (showRaw || (!rows.length && !columns.length && !values.length)) {
@@ -102,10 +114,11 @@ export const PivotTable = () => {
 
           if (limitColumns && estimation && estimation.shouldWarn) {
             const { limitedData, columnsLimited, originalColumns } =
-              limitColumnsForRendering(data, columns, 200);
+              limitColumnsForRendering(data, columns, values, 200);
 
             dataToProcess = limitedData;
 
+            // Recalculate estimation with limited data
             const newEstimation = estimatePivotSize(
               limitedData,
               columns,
