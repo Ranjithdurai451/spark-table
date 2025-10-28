@@ -25,13 +25,9 @@ interface PivotResult {
 }
 
 export const PivotTable = () => {
-  const { rows, columns, values } = usePivotStore(
-    useShallow((s) => ({
-      rows: s.rows,
-      columns: s.columns,
-      values: s.values,
-    }))
-  );
+  const rows = usePivotStore(useShallow((s) => s.rows));
+  const columns = usePivotStore(useShallow((s) => s.columns));
+  const values = usePivotStore(useShallow((s) => s.values));
   const showRaw = usePivotStore((s) => s.showRaw);
 
   const valueFields = useMemo(

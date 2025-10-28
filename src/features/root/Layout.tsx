@@ -10,13 +10,13 @@ import { useShallow } from "zustand/shallow";
 
 export default function Layout() {
   const [openUpload, setOpenUpload] = useState(false);
-  const { data, fileName } = usePivotStore(
+  const { data, fileName, clearData } = usePivotStore(
     useShallow((s) => ({
       data: s.data,
       fileName: s.fileName,
+      clearData: s.clearData,
     }))
   );
-  const { clearData } = usePivotStore();
   const [dismissed, setDismissed] = useState(false);
 
   return (

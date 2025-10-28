@@ -15,17 +15,20 @@ import type {
 } from "@/lib/types";
 
 export const usePivotComputation = () => {
-  const { data, rows, columns, values } = usePivotStore(
+  const { data, revertToPreviousState, showRaw } = usePivotStore(
     useShallow((s) => ({
       data: s.data,
+      revertToPreviousState: s.revertToPreviousState,
+      showRaw: s.showRaw,
+    }))
+  );
+  const { rows, columns, values } = usePivotStore(
+    useShallow((s) => ({
       rows: s.rows,
       columns: s.columns,
       values: s.values,
     }))
   );
-
-  const showRaw = usePivotStore((s) => s.showRaw);
-  const revertToPreviousState = usePivotStore((s) => s.revertToPreviousState);
 
   const valueFields = useMemo(
     () => values.map((v) => v.field).join(","),

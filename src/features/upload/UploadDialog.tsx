@@ -17,7 +17,6 @@ export const UploadDialog = ({
   open: boolean;
   onOpenChange: (open: boolean) => void;
 }) => {
-  // const { setData, clearData } = usePivotStore();
   const setData = usePivotStore((s) => s.setData);
   const clearData = usePivotStore((s) => s.clearData);
 

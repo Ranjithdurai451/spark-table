@@ -7,17 +7,30 @@ import { Separator } from "@radix-ui/react-dropdown-menu";
 import { GripVertical, Search } from "lucide-react";
 import { useMemo, useState } from "react";
 import { createDragId } from "./SidebarControls";
+import { useShallow } from "zustand/shallow";
 
 export const DataPanel = ({ fields }: { fields: string[] }) => {
+  // const { getFieldZone, addToZone, removeFromZone, setShowRaw, clearZone } =
+  //   usePivotStore();
   const {
+    showRaw,
     getFieldZone,
     addToZone,
     removeFromZone,
-    numericFields,
-    showRaw,
     setShowRaw,
     clearZone,
-  } = usePivotStore();
+    numericFields,
+  } = usePivotStore(
+    useShallow((s) => ({
+      showRaw: s.showRaw,
+      getFieldZone: s.getFieldZone,
+      addToZone: s.addToZone,
+      removeFromZone: s.removeFromZone,
+      setShowRaw: s.setShowRaw,
+      clearZone: s.clearZone,
+      numericFields: s.numericFields,
+    }))
+  );
   const [q, setQ] = useState("");
   const filtered = useMemo(
     () => fields.filter((f) => f.toLowerCase().includes(q.toLowerCase())),

@@ -17,6 +17,8 @@ import { useDraggable, useDroppable } from "@dnd-kit/core";
 import { Tab } from "./Tab";
 import { PanelShell } from "./PanelShell";
 import { DataPanel } from "./DataPanel";
+import { useShallow } from "zustand/shallow";
+// import { add } from "@dnd-kit/utilities";
 
 export const createDragId = (zone: string, field: string) => `${zone}:${field}`;
 export const parseDragId = (id: string) => {
@@ -39,19 +41,27 @@ export const SidebarControls = ({
   });
   const openCount = Number(open.viz) + Number(open.data);
   const width = railW + panelW * openCount;
-  const [_, setActiveId] = useState<string | null>(null);
   const [activeField, setActiveField] = useState<string | null>(null);
 
   const {
-    rows,
-    columns,
-    values,
     addToZone,
     moveBetweenZones,
     removeFromZone,
     getFieldZone,
     clearZone,
-  } = usePivotStore();
+  } = usePivotStore(
+    useShallow((s) => ({
+      addToZone: s.addToZone,
+      moveBetweenZones: s.moveBetweenZones,
+      removeFromZone: s.removeFromZone,
+      getFieldZone: s.getFieldZone,
+      clearZone: s.clearZone,
+    }))
+  );
+
+  const rows = usePivotStore(useShallow((s) => s.rows));
+  const columns = usePivotStore(useShallow((s) => s.columns));
+  const values = usePivotStore(useShallow((s) => s.values));
 
   const sensors = useSensors(
     useSensor(PointerSensor, {
@@ -64,14 +74,12 @@ export const SidebarControls = ({
   const handleDragStart = (event: DragStartEvent) => {
     const dragId = event.active.id as string;
     const { field } = parseDragId(dragId);
-    setActiveId(dragId);
     setActiveField(field);
   };
 
   const handleDragEnd = (event: DragEndEvent) => {
     const { active, over } = event;
 
-    setActiveId(null);
     setActiveField(null);
 
     if (!over) return;
@@ -114,7 +122,6 @@ export const SidebarControls = ({
   };
 
   const handleDragCancel = () => {
-    setActiveId(null);
     setActiveField(null);
   };
 
@@ -278,7 +285,8 @@ function DropZoneArea({
   emptyHint: string;
   onClear: () => void;
 }) {
-  const { removeFromZone } = usePivotStore();
+  // const { removeFromZone } = usePivotStore();
+  const removeFromZone = usePivotStore((s) => s.removeFromZone);
   const { setNodeRef, isOver } = useDroppable({ id });
 
   return (
@@ -388,7 +396,14 @@ function ValuesZoneArea({
 }
 
 function ValueFieldItem({ value }: { value: { field: string; agg: string } }) {
-  const { setValueAgg, removeValueField, numericFields } = usePivotStore();
+  // const { setValueAgg, removeValueField, numericFields } = usePivotStore();
+  const { setValueAgg, removeValueField, numericFields } = usePivotStore(
+    useShallow((s) => ({
+      setValueAgg: s.setValueAgg,
+      removeValueField: s.removeValueField,
+      numericFields: s.numericFields,
+    }))
+  );
   const dragId = createDragId("values", value.field);
 
   // Check if field is numeric
