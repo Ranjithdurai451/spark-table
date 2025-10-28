@@ -11,16 +11,17 @@ export interface CellStats {
   max: number | null;
 }
 
+export type DataRow = Record<string, unknown>;
 export interface AggregateDataResult {
-  table: Record<string, any>[];
-  grandTotal: Record<string, any> | null;
+  table: DataRow[];
+  grandTotal: DataRow | null;
   rowGroups: string[];
   colGroups: string[];
   valueCols: string[];
   widths: Record<string, number>;
   colAggInfo: Record<string, { field: string; agg: string }>;
 }
-
+export type SpreadsheetRow = Record<string, string | number | boolean | null>;
 export interface HeaderCell {
   label: string;
   colSpan: number;
@@ -47,3 +48,22 @@ export interface PivotEstimation {
 export type Agg = "sum" | "avg" | "count" | "min" | "max";
 export type Zone = "rows" | "columns" | "values" | "data";
 export type ValueItem = { field: string; agg: Agg };
+
+export interface LimitColumnsResult {
+  limitedData: DataRow[];
+  columnsLimited: boolean;
+  originalColumns: number;
+  displayedColumns: number;
+}
+export interface PivotComputationResult {
+  table: any[];
+  grandTotal: Record<string, any> | null;
+  rowGroups: string[];
+  valueCols: string[];
+  leafCols: string[];
+  headerRows: { label: string; colSpan: number }[][];
+  colAggInfo: Record<string, { field: string; agg: string }>;
+  hasGrandTotal: boolean;
+  hasOnlyRows: boolean;
+  rowSpans: Record<number, RowSpanInfo[]>;
+}

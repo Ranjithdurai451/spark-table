@@ -1,10 +1,15 @@
 import { useMemo, useState } from "react";
 import { usePivotStore } from "@/features/table-view/pivot-table/store/pivot-store";
 import { Pagination } from "./Pagination";
+import { useShallow } from "zustand/shallow";
 
 export const DefaultTable = () => {
-  const data = usePivotStore((state) => state.data);
-  const fields = usePivotStore((state) => state.fields);
+  const { data, fields } = usePivotStore(
+    useShallow((s) => ({
+      data: s.data,
+      fields: s.fields,
+    }))
+  );
 
   const [page, setPage] = useState(1);
   const pageSize = 50;

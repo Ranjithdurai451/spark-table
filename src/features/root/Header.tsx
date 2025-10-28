@@ -14,7 +14,7 @@ const Header = ({
   fileName,
   clearData,
 }: {
-  data: any[];
+  data: unknown[];
   setOpenUpload: (open: boolean) => void;
   clearData: () => void;
   fileName: string | null | undefined;

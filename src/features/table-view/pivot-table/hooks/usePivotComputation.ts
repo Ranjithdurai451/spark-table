@@ -1,104 +1,142 @@
-import { useState, useCallback, useRef, useMemo } from "react";
+import { useState, useMemo, useCallback, useTransition } from "react";
 import { usePivotStore } from "@/features/table-view/pivot-table/store/pivot-store";
-import type { AggregateDataResult, PivotEstimation } from "@/lib/types";
 import { aggregateData } from "../core/pivot-aggregation";
 import {
   estimatePivotSize,
   limitColumnsForRendering,
+  MAX_RENDER_COLUMNS,
 } from "../core/pivot-size-estimation";
+import { computeRowSpans, buildColHeaderTree } from "../core/pivot-grouping";
+import { useShallow } from "zustand/shallow";
+import type {
+  AggregateDataResult,
+  LimitColumnsResult,
+  PivotComputationResult,
+} from "@/lib/types";
 
 export const usePivotComputation = () => {
-  const { data, rows, columns, values, showRaw, revertToPreviousState } =
-    usePivotStore();
+  const { data, rows, columns, values } = usePivotStore(
+    useShallow((s) => ({
+      data: s.data,
+      rows: s.rows,
+      columns: s.columns,
+      values: s.values,
+    }))
+  );
 
-  const [status, setStatus] = useState<
-    "idle" | "awaiting" | "computing" | "ready" | "error"
-  >("idle");
-  const [result, setResult] = useState<AggregateDataResult | null>(null);
+  const showRaw = usePivotStore((s) => s.showRaw);
+  const revertToPreviousState = usePivotStore((s) => s.revertToPreviousState);
+
+  const valueFields = useMemo(
+    () => values.map((v) => v.field).join(","),
+    [values]
+  );
+
+  const [result, setResult] = useState<PivotComputationResult | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [columnLimitInfo, setColumnLimitInfo] = useState<any>(null);
+  const [columnLimitInfo, setColumnLimitInfo] = useState<Omit<
+    LimitColumnsResult,
+    "limitedData"
+  > | null>(null);
 
-  const prevColumnsRef = useRef<string[]>([]);
-  const prevValuesRef = useRef<typeof values>([]);
-  const prevEstimationRef = useRef<PivotEstimation | null>(null);
+  const [isPending, startTransition] = useTransition();
 
-  // Memoize estimation with array comparison
   const estimation = useMemo(() => {
-    if (showRaw || columns.length === 0) return null;
-
-    const sameCols =
-      prevColumnsRef.current.length === columns.length &&
-      prevColumnsRef.current.every((c, i) => c === columns[i]);
-
-    const sameVals =
-      prevValuesRef.current.length === values.length &&
-      prevValuesRef.current.every(
-        (v, i) => v.field === values[i].field && v.agg === values[i].agg
-      );
-
-    if (sameCols && sameVals && prevEstimationRef.current)
-      return prevEstimationRef.current;
-
-    const est = estimatePivotSize(data, columns, values);
-    prevColumnsRef.current = [...columns];
-    prevValuesRef.current = [...values];
-    prevEstimationRef.current = est;
-    return est;
-  }, [columns, values, data, showRaw]);
+    if (showRaw) return null;
+    return estimatePivotSize(data, columns, values);
+  }, [data, columns, valueFields, showRaw]);
 
   const compute = useCallback(
     (limitColumns = false) => {
-      setStatus("computing");
       setResult(null);
       setError(null);
 
-      const run = () => {
+      startTransition(() => {
         try {
-          let working = data;
+          let workingData = data;
           let info = {
-            limited: false,
+            columnsLimited: false,
             originalColumns: 0,
             displayedColumns: 0,
           };
 
           if (limitColumns && estimation?.shouldWarn) {
-            const { limitedData, columnsLimited, originalColumns } =
-              limitColumnsForRendering(data, columns, values, 1000);
-            working = limitedData;
-
-            const newEst = estimatePivotSize(limitedData, columns, values);
+            const limited = limitColumnsForRendering(
+              data,
+              columns,
+              values,
+              MAX_RENDER_COLUMNS
+            );
+            workingData = limited.limitedData;
             info = {
-              limited: columnsLimited,
-              originalColumns,
-              displayedColumns: newEst.estimatedColumns,
+              columnsLimited: limited.columnsLimited,
+              originalColumns: limited.originalColumns,
+              displayedColumns: limited.displayedColumns,
             };
           }
 
-          const res = aggregateData(working, rows, columns, values);
-          setResult(res);
+          const aggregated: AggregateDataResult = aggregateData(
+            workingData,
+            rows,
+            columns,
+            values
+          );
+
+          const rowSpans = computeRowSpans(
+            aggregated.table,
+            aggregated.rowGroups
+          );
+
+          const { headerRows, leafCols } = buildColHeaderTree(
+            aggregated.valueCols,
+            aggregated.colGroups
+          );
+
+          const hasGrandTotal =
+            !!aggregated.grandTotal && aggregated.rowGroups.length > 0;
+          const hasOnlyRows =
+            aggregated.rowGroups.length > 0 && leafCols.length === 0;
+
+          const fullResult: PivotComputationResult = {
+            table: aggregated.table,
+            grandTotal: aggregated.grandTotal,
+            rowGroups: aggregated.rowGroups,
+            valueCols: aggregated.valueCols,
+            leafCols,
+            headerRows,
+            colAggInfo: aggregated.colAggInfo,
+            hasGrandTotal,
+            hasOnlyRows,
+            rowSpans,
+          };
+
           setColumnLimitInfo(info);
-          setStatus("ready");
+          setResult(fullResult);
         } catch (err) {
-          setStatus("error");
+          console.error("Pivot computation error:", err);
           setError(
             err instanceof Error ? err.message : "Pivot computation failed"
           );
         }
-      };
-
-      if (typeof requestIdleCallback !== "undefined")
-        requestIdleCallback(run, { timeout: 100 });
-      else setTimeout(run, 50);
+      });
     },
-    [data, rows, columns, values, estimation]
+    [data, rows, columns, valueFields, estimation]
   );
 
   const reset = useCallback(() => {
-    setStatus("idle");
     setResult(null);
     setError(null);
+    setColumnLimitInfo(null);
     revertToPreviousState();
   }, [revertToPreviousState]);
 
-  return { status, result, error, estimation, compute, reset, columnLimitInfo };
+  return {
+    result,
+    error,
+    estimation,
+    compute,
+    reset,
+    columnLimitInfo,
+    isPending,
+  };
 };

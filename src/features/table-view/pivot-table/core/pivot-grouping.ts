@@ -1,7 +1,7 @@
 import type { RowSpanInfo, HeaderCell } from "@/lib/types";
 
 export function computeRowSpans(
-  data: any[],
+  data: Record<string, any>[],
   groupFields: string[]
 ): Record<number, RowSpanInfo[]> {
   const dataLen = data.length;
@@ -11,21 +11,21 @@ export function computeRowSpans(
 
   const spans: Record<number, RowSpanInfo[]> = {};
 
+  // Initialize spans with default values
   for (let i = 0; i < dataLen; i++) {
-    const isSubtotal = data[i].__isSubtotal || false;
-    const subtotalLevel = data[i].__subtotalLevel ?? -1;
+    const row = data[i];
+    const isSubtotal = Boolean(row.__isSubtotal);
+    const subtotalLevel =
+      typeof row.__subtotalLevel === "number" ? row.__subtotalLevel : -1;
 
-    spans[i] = new Array(groupFieldsLen);
-    for (let lvl = 0; lvl < groupFieldsLen; lvl++) {
-      spans[i][lvl] = {
-        span: isSubtotal && lvl === subtotalLevel ? 1 : 0,
-        isSubtotal,
-        level: subtotalLevel,
-      };
-    }
+    spans[i] = Array.from({ length: groupFieldsLen }, (_, lvl) => ({
+      span: isSubtotal && lvl === subtotalLevel ? 1 : 0,
+      isSubtotal,
+      level: subtotalLevel,
+    }));
   }
-  // console.log("Spans after initialization:", spans);
 
+  // Compute spans for each grouping level
   for (let lvl = 0; lvl < groupFieldsLen; lvl++) {
     let i = 0;
 
@@ -42,9 +42,13 @@ export function computeRowSpans(
 
       while (j < dataLen) {
         const nextRow = data[j];
-        const nextIsSubtotal = nextRow.__isSubtotal || false;
-        const nextSubtotalLevel = nextRow.__subtotalLevel ?? -1;
+        const nextIsSubtotal = Boolean(nextRow.__isSubtotal);
+        const nextSubtotalLevel =
+          typeof nextRow.__subtotalLevel === "number"
+            ? nextRow.__subtotalLevel
+            : -1;
 
+        // Check if previous levels match
         let allMatch = true;
         for (let k = 0; k < lvl; k++) {
           if (nextRow[groupFields[k]] !== currentRow[groupFields[k]]) {
@@ -55,13 +59,13 @@ export function computeRowSpans(
 
         if (!allMatch) break;
 
-        if (nextIsSubtotal && nextSubtotalLevel === lvl) {
+        // Stop if subtotal at or above current level
+        if (nextIsSubtotal && nextSubtotalLevel <= lvl) {
           j++;
           break;
         }
 
-        if (nextIsSubtotal && nextSubtotalLevel < lvl) break;
-
+        // Stop when the group value changes
         if (!nextIsSubtotal && nextRow[groupFields[lvl]] !== currentValue) {
           break;
         }
@@ -78,7 +82,6 @@ export function computeRowSpans(
       i = j;
     }
   }
-  // console.log("Final computed spans:", spans);
 
   return spans;
 }
@@ -88,13 +91,9 @@ export function buildColHeaderTree(
   groupFields: string[]
 ): { headerRows: HeaderCell[][]; leafCols: string[] } {
   const leafColsLen = leafCols.length;
-
-  if (leafColsLen === 0) {
-    return { headerRows: [], leafCols: [] };
-  }
+  if (leafColsLen === 0) return { headerRows: [], leafCols: [] };
 
   const groupFieldsLen = groupFields.length;
-
   if (groupFieldsLen === 0) {
     return {
       headerRows: [leafCols.map((col) => ({ label: col, colSpan: 1 }))],
@@ -105,6 +104,7 @@ export function buildColHeaderTree(
   const columnData = new Array(leafColsLen);
   let hasValueLevel = false;
 
+  // Parse leaf columns into structured components
   for (let i = 0; i < leafColsLen; i++) {
     const key = leafCols[i];
     const parts = key.split("|||");
@@ -112,13 +112,13 @@ export function buildColHeaderTree(
       parts.length > groupFieldsLen ? parts[groupFieldsLen] : "";
 
     if (valueLabel) hasValueLevel = true;
-
     columnData[i] = { key, parts, valueLabel };
   }
 
   const totalLevels = hasValueLevel ? groupFieldsLen + 1 : groupFieldsLen;
   const headerRows: HeaderCell[][] = new Array(totalLevels);
 
+  // Construct header rows for each level
   for (let level = 0; level < totalLevels; level++) {
     const headerRow: HeaderCell[] = [];
     let i = 0;
@@ -140,6 +140,7 @@ export function buildColHeaderTree(
 
         if (nextLabel !== currentLabel) break;
 
+        // Check if higher-level parts match
         let previousLevelsMatch = true;
         for (let k = 0; k < level; k++) {
           if (columnData[i].parts[k] !== columnData[j].parts[k]) {

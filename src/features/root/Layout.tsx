@@ -6,10 +6,17 @@ import { SidebarControls } from "../sidebar/SidebarControls";
 import { TableView } from "../table-view/TableView";
 import Header from "./Header";
 import MobileBanner from "./MobileBanner";
+import { useShallow } from "zustand/shallow";
 
 export default function Layout() {
   const [openUpload, setOpenUpload] = useState(false);
-  const { data, fileName, clearData } = usePivotStore();
+  const { data, fileName } = usePivotStore(
+    useShallow((s) => ({
+      data: s.data,
+      fileName: s.fileName,
+    }))
+  );
+  const { clearData } = usePivotStore();
   const [dismissed, setDismissed] = useState(false);
 
   return (

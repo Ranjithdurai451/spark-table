@@ -10,6 +10,7 @@ export const PivotTableRow = memo(
     rowSpans,
     leafCols,
     colAggInfo,
+    currentAggregations,
   }: {
     row: any;
     rowIndex: number;
@@ -17,6 +18,7 @@ export const PivotTableRow = memo(
     rowSpans: Record<number, RowSpanInfo[]>;
     leafCols: string[];
     colAggInfo: Record<string, { field: string; agg: string }>;
+    currentAggregations: Record<string, string>;
   }) => {
     const isSubtotal = row.__isSubtotal || false;
     const subtotalLevel = row.__subtotalLevel ?? -1;
@@ -69,7 +71,8 @@ export const PivotTableRow = memo(
         })}
 
         {leafCols.map((col, colIndex) => {
-          const value = getAggValue(row, col, colAggInfo);
+          // ✅ Pass current aggregations
+          const value = getAggValue(row, col, colAggInfo, currentAggregations);
           const isPlaceholder = value === "-";
           const isNum = typeof value === "number" && isFinite(value);
           const isEmpty =

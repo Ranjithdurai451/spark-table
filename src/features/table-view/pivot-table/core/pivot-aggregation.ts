@@ -1,6 +1,9 @@
-import type { AggregationValue, AggregateDataResult } from "@/lib/types";
-import { computeCellStats } from "./pivot-stats";
-import { insertSubtotalRows, calculateGrandTotal } from "./pivot-total";
+import type {
+  AggregationValue,
+  CellStats,
+  AggregateDataResult,
+} from "@/lib/types";
+import { insertSubtotalRows } from "./pivot-total";
 
 export function aggregateData(
   data: any[],
@@ -9,7 +12,6 @@ export function aggregateData(
   values: AggregationValue[]
 ): AggregateDataResult {
   const dataLen = data.length;
-
   if (dataLen === 0) {
     return {
       table: [],
@@ -25,145 +27,119 @@ export function aggregateData(
   const hasValues = values.length > 0;
   const rowsLen = rows.length;
   const colsLen = cols.length;
-  const valsLen = values.length;
 
-  const rowDataMap = new Map<string, any[]>();
-  const colKeysSet = new Set<string>();
-  const cellDataMap = new Map<string, any[]>();
+  const tableMap = new Map<string, Record<string, any>>();
   const rowKeyOrder: string[] = [];
-
+  const colKeysSet = new Set<string>();
   const colAggInfo: Record<string, { field: string; agg: string }> = {};
+  const grandTotals: Record<string, CellStats> = {};
 
-  for (let i = 0; i < dataLen; i++) {
-    const row = data[i];
+  for (const row of data) {
+    // --- Build row key
+    const rowKey =
+      rowsLen === 0
+        ? "TOTAL"
+        : rows.map((r) => String(row[r] ?? "N/A")).join("|||");
 
-    let rowKey: string;
-    if (rowsLen === 0) {
-      rowKey = "TOTAL";
-    } else if (rowsLen === 1) {
-      rowKey = String(row[rows[0]] ?? "N/A");
-    } else {
-      const parts: string[] = new Array(rowsLen);
-      for (let r = 0; r < rowsLen; r++) {
-        parts[r] = String(row[rows[r]] ?? "N/A");
+    let rowObj = tableMap.get(rowKey);
+    if (!rowObj) {
+      rowObj = {};
+      if (rowsLen > 0) {
+        const parts = rowKey.split("|||");
+        for (let r = 0; r < rowsLen; r++) rowObj[rows[r]] = parts[r];
       }
-      rowKey = parts.join("|||");
-    }
-
-    if (!rowDataMap.has(rowKey)) {
-      rowDataMap.set(rowKey, []);
+      tableMap.set(rowKey, rowObj);
       rowKeyOrder.push(rowKey);
     }
-    rowDataMap.get(rowKey)!.push(row);
 
-    if (colsLen > 0) {
-      let colKeyBase: string;
-      if (colsLen === 1) {
-        colKeyBase = String(row[cols[0]] ?? "N/A");
-      } else {
-        const parts: string[] = new Array(colsLen);
-        for (let c = 0; c < colsLen; c++) {
-          parts[c] = String(row[cols[c]] ?? "N/A");
-        }
-        colKeyBase = parts.join("|||");
-      }
+    // --- Build column key base
+    const colKeyBase =
+      colsLen === 0 ? "" : cols.map((c) => String(row[c] ?? "N/A")).join("|||");
+    // console.log(colKeyBase);
 
-      if (hasValues) {
-        for (let v = 0; v < valsLen; v++) {
-          const val = values[v];
-          const colKey = `${colKeyBase}|||${val.field}(${val.agg})`;
-          colKeysSet.add(colKey);
+    if (hasValues) {
+      for (const { field, agg } of values) {
+        const colKey =
+          colsLen > 0 ? `${colKeyBase}|||${field}(${agg})` : `${field}(${agg})`;
 
-          colAggInfo[colKey] = { field: val.field, agg: val.agg };
-
-          const cellKey = `${rowKey}::${colKey}`;
-          const cellRows = cellDataMap.get(cellKey);
-          if (cellRows) {
-            cellRows.push(row);
-          } else {
-            cellDataMap.set(cellKey, [row]);
-          }
-        }
-      } else {
-        colKeysSet.add(colKeyBase);
-        const cellKey = `${rowKey}::${colKeyBase}`;
-        const cellRows = cellDataMap.get(cellKey);
-        if (cellRows) {
-          cellRows.push(row);
-        } else {
-          cellDataMap.set(cellKey, [row]);
-        }
-      }
-    } else if (hasValues) {
-      for (let v = 0; v < valsLen; v++) {
-        const val = values[v];
-        const colKey = `${val.field}(${val.agg})`;
         colKeysSet.add(colKey);
+        colAggInfo[colKey] = { field, agg };
 
-        colAggInfo[colKey] = { field: val.field, agg: val.agg };
+        // --- Update cell stats
+        const stats =
+          rowObj[colKey] ??
+          (rowObj[colKey] = {
+            rawCount: 0,
+            validCount: 0,
+            sum: 0,
+            min: Infinity,
+            max: -Infinity,
+          });
 
-        const cellKey = `${rowKey}::${colKey}`;
-        const cellRows = cellDataMap.get(cellKey);
-        if (cellRows) {
-          cellRows.push(row);
-        } else {
-          cellDataMap.set(cellKey, [row]);
+        stats.rawCount++;
+        const val = Number(row[field]);
+        if (isFinite(val)) {
+          stats.validCount++;
+          stats.sum += val;
+          if (val < stats.min) stats.min = val;
+          if (val > stats.max) stats.max = val;
+        }
+
+        // --- Grand totals (only for value mode)
+        const total =
+          grandTotals[colKey] ??
+          (grandTotals[colKey] = {
+            rawCount: 0,
+            validCount: 0,
+            sum: 0,
+            min: Infinity,
+            max: -Infinity,
+          });
+
+        total.rawCount++;
+        if (isFinite(val)) {
+          total.validCount++;
+          total.sum = (total.sum ?? 0) + val;
+          if (val < (total.min ?? Infinity)) total.min = val;
+          if (val > (total.max ?? -Infinity)) total.max = val;
         }
       }
+    } else if (colsLen > 0) {
+      // --- Non-value mode
+      const colKey = colKeyBase;
+      colKeysSet.add(colKey);
+      // (rowObj[colKey] ??= { rawCount: 0 }).rawCount++;
     }
   }
-
-  const colKeys = Array.from(colKeysSet).sort();
-  const colKeysLen = colKeys.length;
-
-  const rowKeyOrderLen = rowKeyOrder.length;
-  const baseTable: Record<string, any>[] = new Array(rowKeyOrderLen);
-
-  for (let r = 0; r < rowKeyOrderLen; r++) {
-    const rowKey = rowKeyOrder[r];
-    const rowObj: Record<string, any> = {};
-
-    if (rowsLen > 0) {
-      const rowKeyParts = rowKey.split("|||");
-      for (let i = 0; i < rowsLen; i++) {
-        rowObj[rows[i]] = rowKeyParts[i] || "N/A";
-      }
-    }
-
-    for (let c = 0; c < colKeysLen; c++) {
-      const colKey = colKeys[c];
-      const cellKey = `${rowKey}::${colKey}`;
-      const filteredRows = cellDataMap.get(cellKey);
-
-      if (hasValues) {
-        const aggInfo = colAggInfo[colKey];
-        rowObj[colKey] = aggInfo
-          ? computeCellStats(filteredRows || [], aggInfo.field)
-          : null;
-      } else {
-        rowObj[colKey] = filteredRows && filteredRows.length > 0 ? "-" : null;
-      }
-    }
-
-    baseTable[r] = rowObj;
-  }
-
+  // console.log(colKeysSet);
+  // console.log(tableMap);
+  //  Build table in order
+  const colKeys = Array.from(colKeysSet);
+  const table = rowKeyOrder.map((key) => tableMap.get(key)!);
+  // console.log("Aggregated table before subtotals:", { table });
+  //  Add subtotals (if values exist)
   const tableWithSubtotals = hasValues
-    ? insertSubtotalRows(baseTable, rows, colKeys, colAggInfo)
-    : baseTable;
+    ? insertSubtotalRows(table, rows, colKeys, colAggInfo)
+    : table;
 
-  const grandTotal = hasValues
-    ? calculateGrandTotal(tableWithSubtotals, rows, colKeys, colAggInfo)
-    : null;
-
-  const widths: Record<string, number> = {};
-  for (let i = 0; i < colKeysLen; i++) {
-    widths[colKeys[i]] = 150;
+  //  Normalize grand totals in-place
+  if (hasValues) {
+    for (const g of Object.values(grandTotals)) {
+      if (g.validCount === 0) {
+        g.sum = g.min = g.max = null;
+      }
+    }
   }
+  // console.log("Table aggregation result:", {
+  //   table: tableWithSubtotals,
+  // });
+
+  //  Column widths
+  const widths = Object.fromEntries(colKeys.map((col) => [col, 150]));
 
   return {
     table: tableWithSubtotals,
-    grandTotal,
+    grandTotal: hasValues ? grandTotals : null,
     rowGroups: rows,
     colGroups: cols,
     valueCols: colKeys,

@@ -3,7 +3,8 @@ import type { CellStats, ValueItem } from "@/lib/types";
 export function getAggValue(
   rowData: any,
   colKey: string,
-  colAggInfo: Record<string, { field: string; agg: string }>
+  colAggInfo: Record<string, { field: string; agg: string }>,
+  currentAggregations?: Record<string, string>
 ): number | string | null {
   const cell = rowData[colKey];
 
@@ -15,7 +16,7 @@ export function getAggValue(
   const aggInfo = colAggInfo[colKey];
   if (!aggInfo) return null;
 
-  const { agg } = aggInfo;
+  const agg = currentAggregations?.[aggInfo.field] || aggInfo.agg;
 
   switch (agg) {
     case "sum":
