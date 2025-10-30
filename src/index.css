@@ -185,3 +185,17 @@
   scrollbar-width: thin;
   scrollbar-color: var(--muted) transparent; /* For Firefox */
 }
+@keyframes loading {
+  0% {
+    width: 0%;
+    margin-left: 0%;
+  }
+  50% {
+    width: 75%;
+    margin-left: 12.5%;
+  }
+  100% {
+    width: 0%;
+    margin-left: 100%;
+  }
+}

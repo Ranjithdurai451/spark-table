@@ -36,14 +36,14 @@ export const PivotWarningDialog = ({
             </AlertDialogTitle>
           </div>
           <AlertDialogDescription className="space-y-3 pt-2">
-            <div className="text-sm text-foreground">
+            <span className="block text-sm text-foreground">
               This SparkTable is attempting to produce{" "}
               {estimatedColumns.toLocaleString()} columns, which may affect
               performance.
-            </div>
-            <div className="text-sm text-foreground">
+            </span>
+            <span className="block text-sm text-foreground">
               Do you want to continue?
-            </div>
+            </span>
           </AlertDialogDescription>
         </AlertDialogHeader>
         <AlertDialogFooter className="sm:space-x-2">

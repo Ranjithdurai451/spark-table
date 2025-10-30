@@ -1,37 +1,76 @@
 import type { CellStats } from "@/lib/types";
 
-export function computeAggregatedStats(statsList: CellStats[]): CellStats {
-  let totalRaw = 0;
-  let totalValid = 0;
-  let totalSum = 0;
-  let minVal = Infinity;
-  let maxVal = -Infinity;
+// export function computeAggregatedStats(statsList: CellStats[]): CellStats {
+//   let totalRaw = 0;
+//   let totalValid = 0;
+//   let totalSum = 0;
+//   let minVal = Infinity;
+//   let maxVal = -Infinity;
 
-  for (const s of statsList) {
-    if (!s) continue;
+//   for (const s of statsList) {
+//     if (!s) continue;
 
-    totalRaw += s.rawCount ?? 0;
-    totalValid += s.validCount ?? 0;
+//     totalRaw += s.rawCount ?? 0;
+//     totalValid += s.validCount ?? 0;
 
-    if (s.validCount > 0) {
-      totalSum += s.sum ?? 0;
-      if (s.min !== null && s.min < minVal) minVal = s.min;
-      if (s.max !== null && s.max > maxVal) maxVal = s.max;
-    }
-  }
+//     if (s.validCount > 0) {
+//       totalSum += s.sum ?? 0;
+//       if (s.min !== null && s.min < minVal) minVal = s.min;
+//       if (s.max !== null && s.max > maxVal) maxVal = s.max;
+//     }
+//   }
 
-  const hasValid = totalValid > 0;
+//   const hasValid = totalValid > 0;
 
-  return {
-    rawCount: totalRaw,
-    validCount: totalValid,
-    sum: hasValid ? totalSum : null,
-    min: hasValid && minVal < Infinity ? minVal : null,
-    max: hasValid && maxVal > -Infinity ? maxVal : null,
-  };
-}
+//   return {
+//     rawCount: totalRaw,
+//     validCount: totalValid,
+//     sum: hasValid ? totalSum : null,
+//     min: hasValid && minVal < Infinity ? minVal : null,
+//     max: hasValid && maxVal > -Infinity ? maxVal : null,
+//   };
+// }
 
-function makeSubtotalRow(
+// function makeSubtotalRow(
+//   level: number,
+//   groupKey: string,
+//   parentValues: Record<string, any>,
+//   rowGroups: string[],
+//   valueCols: string[],
+//   colAggInfo: Record<string, { field: string; agg: string }>,
+//   rows: any[]
+// ) {
+//   const subtotalRow: any = {
+//     __isSubtotal: true,
+//     __subtotalLevel: level,
+//     __subtotalLabel: `Total ${groupKey}`,
+//     ...parentValues,
+//     [rowGroups[level]]: `Total ${groupKey}`,
+//   };
+
+//   for (let i = level + 1; i < rowGroups.length; i++) {
+//     subtotalRow[rowGroups[i]] = null;
+//   }
+
+//   for (const colKey of valueCols) {
+//     const aggInfo = colAggInfo[colKey];
+//     if (!aggInfo) {
+//       subtotalRow[colKey] = null;
+//       continue;
+//     }
+
+//     const statsList: CellStats[] = [];
+//     for (const r of rows) {
+//       if (!r.__isSubtotal && r[colKey]) statsList.push(r[colKey]);
+//     }
+
+//     subtotalRow[colKey] = computeAggregatedStats(statsList);
+//   }
+
+//   return subtotalRow;
+// }
+
+export function makeSubtotalRow(
   level: number,
   groupKey: string,
   parentValues: Record<string, any>,
@@ -48,9 +87,10 @@ function makeSubtotalRow(
     [rowGroups[level]]: `Total ${groupKey}`,
   };
 
-  for (let i = level + 1; i < rowGroups.length; i++) {
-    subtotalRow[rowGroups[i]] = null;
-  }
+  // Fill remaining group columns with null
+  // for (let i = level + 1; i < rowGroups.length; i++) {
+  //   subtotalRow[rowGroups[i]] = null;
+  // }
 
   for (const colKey of valueCols) {
     const aggInfo = colAggInfo[colKey];
@@ -59,12 +99,36 @@ function makeSubtotalRow(
       continue;
     }
 
-    const statsList: CellStats[] = [];
+    let totalRaw = 0;
+    let totalValid = 0;
+    let totalSum = 0;
+    let minVal = Infinity;
+    let maxVal = -Infinity;
+
     for (const r of rows) {
-      if (!r.__isSubtotal && r[colKey]) statsList.push(r[colKey]);
+      if (r.__isSubtotal) continue;
+
+      const s = r[colKey] as CellStats | undefined;
+      if (!s) continue;
+
+      totalRaw += s.rawCount ?? 0;
+      totalValid += s.validCount ?? 0;
+
+      if (s.validCount > 0) {
+        totalSum += s.sum ?? 0;
+        if (s.min !== null && s.min < minVal) minVal = s.min;
+        if (s.max !== null && s.max > maxVal) maxVal = s.max;
+      }
     }
 
-    subtotalRow[colKey] = computeAggregatedStats(statsList);
+    const hasValid = totalValid > 0;
+    subtotalRow[colKey] = {
+      rawCount: totalRaw,
+      validCount: totalValid,
+      sum: hasValid ? totalSum : null,
+      min: hasValid && minVal < Infinity ? minVal : null,
+      max: hasValid && maxVal > -Infinity ? maxVal : null,
+    };
   }
 
   return subtotalRow;
@@ -75,8 +139,10 @@ export function insertSubtotalRows(
   rowGroups: string[],
   valueCols: string[],
   colAggInfo: Record<string, { field: string; agg: string }>
-): any[] {
-  if (rowGroups.length === 0 || data.length === 0) return data;
+): { table: any[]; hasSubtotals: boolean } {
+  if (rowGroups.length === 0 || data.length === 0) {
+    return { table: data, hasSubtotals: false };
+  }
 
   const groupBy = (arr: any[], key: string) => {
     const map = new Map<string, any[]>();
@@ -87,6 +153,8 @@ export function insertSubtotalRows(
     }
     return map;
   };
+
+  let hasSubtotals = false;
 
   const process = (
     rows: any[],
@@ -99,12 +167,13 @@ export function insertSubtotalRows(
     const groups = groupBy(rows, key);
     const result: any[] = [];
 
-    for (const [groupKey, groupRows] of Array.from(groups.entries()).sort()) {
+    for (const [groupKey, groupRows] of Array.from(groups.entries())) {
       const nextParent = { ...parentValues, [key]: groupKey };
       const processed = process(groupRows, level + 1, nextParent);
       result.push(...processed);
 
       if (processed.length > 1) {
+        hasSubtotals = true;
         const subtotalRow = makeSubtotalRow(
           level,
           groupKey,
@@ -121,5 +190,6 @@ export function insertSubtotalRows(
     return result;
   };
 
-  return process(data, 0, {});
+  const table = process(data, 0, {});
+  return { table, hasSubtotals };
 }

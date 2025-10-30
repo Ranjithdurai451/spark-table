@@ -8,7 +8,7 @@ import {
 import { Button } from "@/components/ui/button";
 import * as XLSX from "xlsx";
 import { usePivotStore } from "@/features/table-view/pivot-table/store/pivot-store";
-import { useRef, useState } from "react";
+import { useRef, useState, useTransition } from "react";
 
 export const UploadDialog = ({
   open,
@@ -21,63 +21,45 @@ export const UploadDialog = ({
   const clearData = usePivotStore((s) => s.clearData);
 
   const inputRef = useRef<HTMLInputElement>(null);
-
-  const [busy, setBusy] = useState(false);
-  const [progress, setProgress] = useState(0);
+  const [isPending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
   const [dragActive, setDragActive] = useState(false);
 
-  // simulate upload progress for UX
-  const simulateProgress = () => {
-    setProgress(0);
-    let p = 0;
-    const interval = setInterval(() => {
-      p += 10;
-      setProgress(p);
-      if (p >= 100) clearInterval(interval);
-    }, 100);
-  };
-
   const processFile = async (file: File) => {
-    setBusy(true);
     setError(null);
     clearData();
-    simulateProgress();
 
-    try {
-      const arrayBuffer = await file.arrayBuffer();
-      const workbook = XLSX.read(arrayBuffer, {
-        type: "array",
-        codepage: 65001,
-      });
+    startTransition(async () => {
+      try {
+        const arrayBuffer = await file.arrayBuffer();
+        const workbook = XLSX.read(arrayBuffer, {
+          type: "array",
+          codepage: 65001,
+        });
 
-      const firstSheetName = workbook.SheetNames[0];
-      const worksheet = workbook.Sheets[firstSheetName];
-      const rows = XLSX.utils.sheet_to_json<Record<string, unknown>>(
-        worksheet,
-        {
-          defval: null,
-          raw: false,
-        }
-      );
+        const firstSheetName = workbook.SheetNames[0];
+        const worksheet = workbook.Sheets[firstSheetName];
+        const rows = XLSX.utils.sheet_to_json<Record<string, unknown>>(
+          worksheet,
+          {
+            defval: null,
+            raw: false,
+          }
+        );
 
-      setTimeout(() => {
-        setData(rows, file.name); // Zustand handles file name + data
+        setData(rows, file.name);
         onOpenChange(false);
-        setBusy(false);
         if (inputRef.current) inputRef.current.value = "";
-      }, 1100);
-    } catch (e: unknown) {
-      setError(e instanceof Error ? e.message : "Failed to parse file");
-      setBusy(false);
-      setProgress(0);
-    } finally {
-      setDragActive(false);
-    }
+      } catch (e: unknown) {
+        setError(e instanceof Error ? e.message : "Failed to parse file");
+      } finally {
+        setDragActive(false);
+      }
+    });
   };
 
   const handleFiles = (file: File | null) => {
-    if (!file || busy) return;
+    if (!file || isPending) return;
     processFile(file);
   };
 
@@ -92,13 +74,17 @@ export const UploadDialog = ({
         </DialogHeader>
 
         <div
-          className={`relative rounded-md border border-dashed p-6 text-center cursor-pointer transition-colors ${
+          className={`relative rounded-md border border-dashed p-6 text-center transition-colors ${
             dragActive ? "border-primary bg-primary/10" : "border-muted"
-          } ${busy ? "opacity-60 cursor-not-allowed" : "hover:bg-accent"}`}
-          onClick={() => !busy && inputRef.current?.click()}
+          } ${
+            isPending
+              ? "opacity-60 cursor-not-allowed"
+              : "hover:bg-accent cursor-pointer"
+          }`}
+          onClick={() => !isPending && inputRef.current?.click()}
           onDragOver={(e) => {
             e.preventDefault();
-            if (!busy) setDragActive(true);
+            if (!isPending) setDragActive(true);
           }}
           onDrop={(e) => {
             e.preventDefault();
@@ -110,32 +96,35 @@ export const UploadDialog = ({
           role="button"
           tabIndex={0}
           aria-label="Upload area"
-          aria-disabled={busy}
+          aria-disabled={isPending}
           onKeyDown={(e) => {
-            if (!busy && (e.key === "Enter" || e.key === " "))
+            if (!isPending && (e.key === "Enter" || e.key === " "))
               inputRef.current?.click();
           }}
         >
-          <p className="text-sm">
-            {busy ? "Processing file..." : "Drop file here or click to browse"}
-          </p>
-          <p className="text-xs text-muted-foreground pt-1">
-            CSV, XLSX, XLS supported
-          </p>
-
-          {/* Progress bar */}
-          {busy && (
-            <div className="absolute bottom-0 left-0 h-1 bg-muted w-full rounded-b-md overflow-hidden mt-2">
-              <div
-                className="h-full bg-primary transition-all duration-200 ease-in-out"
-                style={{ width: `${progress}%` }}
-                aria-valuemin={0}
-                aria-valuemax={100}
-                aria-valuenow={progress}
-                role="progressbar"
-                aria-label="Upload progress"
-              />
-            </div>
+          {isPending ? (
+            <>
+              <div className="flex w-full gap-4 justify-center items-center">
+                <div
+                  className="animate-spin inline-block size-6 border-3 border-current border-t-transparent text-primary rounded-full "
+                  role="status"
+                  aria-label="loading"
+                >
+                  <span className="sr-only">Processing...</span>
+                </div>
+                <span className="text-sm">Processing file...</span>
+              </div>
+              <div className="mt-2 text-xs text-muted-foreground">
+                This may take a few moments for large files.
+              </div>
+            </>
+          ) : (
+            <>
+              <p className="text-sm">Drop file here or click to browse</p>
+              <p className="text-xs text-muted-foreground pt-1">
+                CSV, XLSX, XLS supported
+              </p>
+            </>
           )}
         </div>
 
@@ -144,7 +133,7 @@ export const UploadDialog = ({
           type="file"
           accept=".csv,.xlsx,.xls"
           className="hidden"
-          disabled={busy}
+          disabled={isPending}
           onChange={(e) => handleFiles(e.target.files?.[0] ?? null)}
         />
 
@@ -152,7 +141,7 @@ export const UploadDialog = ({
           <Button
             variant="secondary"
             onClick={() => onOpenChange(false)}
-            disabled={busy}
+            disabled={isPending}
           >
             Cancel
           </Button>

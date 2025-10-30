@@ -1,6 +1,12 @@
 import React, { useState } from "react";
 import { cn } from "@/lib/utils";
-import { Database, LayoutDashboard, X, GripVertical } from "lucide-react";
+import {
+  Database,
+  LayoutDashboard,
+  X,
+  GripVertical,
+  Columns,
+} from "lucide-react";
 
 import { usePivotStore } from "@/features/table-view/pivot-table/store/pivot-store";
 import {
@@ -49,6 +55,9 @@ export const SidebarControls = ({
     removeFromZone,
     getFieldZone,
     clearZone,
+    rows,
+    columns,
+    values,
   } = usePivotStore(
     useShallow((s) => ({
       addToZone: s.addToZone,
@@ -56,12 +65,11 @@ export const SidebarControls = ({
       removeFromZone: s.removeFromZone,
       getFieldZone: s.getFieldZone,
       clearZone: s.clearZone,
+      rows: s.rows,
+      columns: s.columns,
+      values: s.values,
     }))
   );
-
-  const rows = usePivotStore(useShallow((s) => s.rows));
-  const columns = usePivotStore(useShallow((s) => s.columns));
-  const values = usePivotStore(useShallow((s) => s.values));
 
   const sensors = useSensors(
     useSensor(PointerSensor, {
@@ -154,7 +162,9 @@ export const SidebarControls = ({
                   title="Rows"
                   items={rows}
                   emptyHint="Drag fields here"
-                  onClear={() => clearZone("rows")}
+                  onClear={() => {
+                    clearZone("rows");
+                  }}
                 />
                 <DropZoneArea
                   id="columns"
@@ -397,10 +407,11 @@ function ValuesZoneArea({
 
 function ValueFieldItem({ value }: { value: { field: string; agg: string } }) {
   // const { setValueAgg, removeValueField, numericFields } = usePivotStore();
-  const { setValueAgg, removeValueField, numericFields } = usePivotStore(
+  const { setValueAgg, removeFromZone, numericFields } = usePivotStore(
     useShallow((s) => ({
       setValueAgg: s.setValueAgg,
-      removeValueField: s.removeValueField,
+      // removeValueField: s.removeValueField,
+      removeFromZone: s.removeFromZone,
       numericFields: s.numericFields,
     }))
   );
@@ -471,7 +482,8 @@ function ValueFieldItem({ value }: { value: { field: string; agg: string } }) {
         className="text-muted-foreground hover:text-foreground opacity-0 group-hover:opacity-100 transition-opacity p-0.5 -mr-0.5 hover:bg-destructive/10 rounded"
         onClick={(e) => {
           e.stopPropagation();
-          removeValueField(value.field);
+          // removeValueField(value.field);
+          removeFromZone("values", value.field);
         }}
         aria-label={`Remove ${value.field}`}
       >

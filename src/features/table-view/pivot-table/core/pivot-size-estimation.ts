@@ -1,7 +1,7 @@
 import type { AggregationValue, DataRow, PivotEstimation } from "@/lib/types";
 
-export const COLUMN_WARNING_THRESHOLD = 500;
-export const MAX_RENDER_COLUMNS = 500;
+export const COLUMN_WARNING_THRESHOLD = 300;
+export const MAX_RENDER_COLUMNS = 300;
 
 /**
  * Estimates number of unique column combinations.

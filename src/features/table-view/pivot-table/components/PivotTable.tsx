@@ -6,47 +6,30 @@ import { Info } from "lucide-react";
 import { usePivotComputation } from "../hooks/usePivotComputation";
 import { PivotLoading } from "./PivotLoading";
 import { PivotError } from "./PivotError";
-import { getAggValue } from "../core/pivot-helpers";
+import { getAggValue, getVisibleRows } from "../core/pivot-helpers";
 import { useShallow } from "zustand/shallow";
 import { PivotTableRow } from "./PivotTableRow";
-import type { RowSpanInfo } from "@/lib/types";
-
-interface PivotResult {
-  table: any[];
-  grandTotal?: Record<string, any>;
-  rowGroups: string[];
-  valueCols: string[];
-  leafCols: any[];
-  headerRows: { label: string; colSpan: number }[][];
-  colAggInfo: Record<string, any>;
-  hasGrandTotal: boolean;
-  hasOnlyRows: boolean;
-  rowSpans: Record<number, RowSpanInfo[]>;
-}
+import type { PivotComputationResult } from "@/lib/types";
 
 export const PivotTable = () => {
-  const rows = usePivotStore(useShallow((s) => s.rows));
-  const columns = usePivotStore(useShallow((s) => s.columns));
-  const values = usePivotStore(useShallow((s) => s.values));
-  const showRaw = usePivotStore((s) => s.showRaw);
+  const { rows, columns, values, showRaw, previousState } = usePivotStore(
+    useShallow((s) => ({
+      rows: s.rows,
+      columns: s.columns,
+      values: s.values,
+      showRaw: s.showRaw,
+      previousState: s.previousState,
+    }))
+  );
 
   const valueFields = useMemo(
     () => values.map((v) => v.field).join(","),
     [values]
   );
 
-  const currentAggregations = useMemo(() => {
-    const map: Record<string, string> = {};
-    values.forEach((v) => {
-      map[v.field] = v.agg;
-    });
-    return map;
-  }, [values]);
-
   const [page, setPage] = useState(1);
   const [showWarning, setShowWarning] = useState(false);
   const [warningHandled, setWarningHandled] = useState(false);
-  const pageSize = 50;
 
   const {
     result,
@@ -57,6 +40,23 @@ export const PivotTable = () => {
     compute,
     isPending,
   } = usePivotComputation();
+
+  useEffect(() => {
+    const prevCols = previousState?.columns ?? [];
+    const prevVals = previousState?.values ?? [];
+
+    const colsChanged =
+      columns.length !== prevCols.length ||
+      columns.some((f, i) => f !== prevCols[i]);
+
+    const valsChanged =
+      values.length !== prevVals.length ||
+      values.some((v, i) => v.field !== prevVals[i]?.field);
+
+    if (colsChanged || valsChanged) {
+      setWarningHandled(false);
+    }
+  }, [columns, valueFields]);
 
   useEffect(() => {
     if (showRaw || (!rows.length && !columns.length && !valueFields)) {
@@ -73,13 +73,11 @@ export const PivotTable = () => {
 
     compute(warningHandled);
   }, [
-    columns,
-    valueFields,
     showRaw,
-    estimation,
-    reset,
-    compute,
     rows.length,
+    columns.length,
+    valueFields.length,
+    estimation?.shouldWarn,
     warningHandled,
     showWarning,
   ]);
@@ -87,7 +85,8 @@ export const PivotTable = () => {
   const handleWarningProceed = useCallback(() => {
     setShowWarning(false);
     setWarningHandled(true);
-  }, []);
+    compute(true);
+  }, [compute]);
 
   const handleWarningCancel = useCallback(() => {
     setShowWarning(false);
@@ -121,9 +120,16 @@ export const PivotTable = () => {
     hasGrandTotal,
     hasOnlyRows,
     rowSpans,
-  } = result as PivotResult;
-
-  const visible = table.slice((page - 1) * pageSize, page * pageSize);
+    hasSubtotals,
+  } = result as PivotComputationResult;
+  const pageSize = 50;
+  const { visible, startIndex } = getVisibleRows(
+    table,
+    page,
+    pageSize,
+    hasSubtotals
+  );
+  // console.log(headerRows);
 
   return (
     <div className="w-full h-full flex flex-col bg-background border border-border overflow-hidden rounded-lg">
@@ -180,12 +186,12 @@ export const PivotTable = () => {
               <PivotTableRow
                 key={i}
                 row={row}
-                rowIndex={i}
+                rowIndex={i + startIndex}
                 rowGroups={rowGroups}
                 rowSpans={rowSpans}
                 leafCols={leafCols}
                 colAggInfo={colAggInfo}
-                currentAggregations={currentAggregations}
+                values={values}
               />
             ))}
           </tbody>
@@ -212,7 +218,7 @@ export const PivotTable = () => {
                     grandTotal,
                     col,
                     colAggInfo,
-                    currentAggregations
+                    values
                   );
                   const isNum = typeof value === "number" && isFinite(value);
 

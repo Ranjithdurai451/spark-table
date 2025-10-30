@@ -1,24 +1,26 @@
-import type { CellStats, ValueItem } from "@/lib/types";
+import type { RowSpanInfo, ValueItem } from "@/lib/types";
 
 export function getAggValue(
   rowData: any,
   colKey: string,
   colAggInfo: Record<string, { field: string; agg: string }>,
-  currentAggregations?: Record<string, string>
+  values: { field: string; agg: string }[]
 ): number | string | null {
   const cell = rowData[colKey];
-
   if (cell === "-") return "-";
-
   if (!cell || typeof cell !== "object") return null;
 
-  const stats = cell as CellStats;
-  const aggInfo = colAggInfo[colKey];
-  if (!aggInfo) return null;
+  const stats = cell as any;
 
-  const agg = currentAggregations?.[aggInfo.field] || aggInfo.agg;
+  // Get field info
+  const info = colAggInfo[colKey];
+  if (!info) return null;
 
-  switch (agg) {
+  // Find the current aggregation type for that field from `values`
+  const currentValue = values.find((v) => v.field === info.field);
+  const aggType = currentValue?.agg || info.agg; // fallback to colAggInfo if not found
+
+  switch (aggType) {
     case "sum":
       return stats.sum ?? null;
     case "count":
@@ -32,19 +34,6 @@ export function getAggValue(
     default:
       return null;
   }
-}
-
-export function removeFieldFromAllZones(
-  rows: string[],
-  columns: string[],
-  values: ValueItem[],
-  field: string
-) {
-  return {
-    rows: rows.filter((f) => f !== field),
-    columns: columns.filter((f) => f !== field),
-    values: values.filter((v) => v.field !== field),
-  };
 }
 
 export function isLikelyDate(val: any): boolean {
@@ -102,3 +91,57 @@ export function inferFieldsMetadata(rows: any[]) {
 
 export const inferFields = (rows: any[]) =>
   rows.length ? Object.keys(rows[0]) : [];
+
+type Row = { [key: string]: any; __isSubtotal?: boolean };
+
+export type RowSpans = Record<number, RowSpanInfo[]>;
+
+export const getVisibleRows = (
+  table: Row[],
+  page: number,
+  pageSize: number,
+  hasSubtotals: boolean
+): { visible: Row[]; startIndex: number } => {
+  const start = (page - 1) * pageSize;
+  const end = page * pageSize;
+
+  // Normal pagination
+  if (!hasSubtotals) {
+    return {
+      visible: table.slice(start, Math.min(end, table.length)),
+      startIndex: start,
+    };
+  }
+
+  // When subtotals exist:
+  // Ensure we start from the beginning of a group and end after its subtotal
+  let s = start;
+  let e = Math.min(table.length, end);
+
+  // 1️⃣ Move `s` backward to start of a group (if current row isn't start)
+  while (s > 0 && !table[s - 1]?.__isSubtotal) {
+    // If previous rows are still part of a group, step back
+    const prev = table[s - 1];
+    const curr = table[s];
+    // Stop if we reached a subtotal or the start of a new group
+    if (prev.__isSubtotal) break;
+    s--;
+  }
+
+  // 2️⃣ Move `e` forward to include group subtotal
+  while (e < table.length && !table[e - 1]?.__isSubtotal) {
+    const curr = table[e - 1];
+    if (curr.__isSubtotal) break;
+    e++;
+    // stop if next is subtotal (end of group)
+    if (table[e]?.__isSubtotal) {
+      e++;
+      break;
+    }
+  }
+
+  return {
+    visible: table.slice(s, Math.min(e, table.length)),
+    startIndex: s,
+  };
+};

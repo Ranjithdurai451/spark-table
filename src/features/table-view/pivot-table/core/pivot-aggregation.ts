@@ -14,12 +14,12 @@ export function aggregateData(
   const dataLen = data.length;
   if (dataLen === 0) {
     return {
+      hasSubtotals: false,
       table: [],
       grandTotal: null,
       rowGroups: rows,
       colGroups: cols,
       valueCols: [],
-      widths: {},
       colAggInfo: {},
     };
   }
@@ -51,11 +51,8 @@ export function aggregateData(
       tableMap.set(rowKey, rowObj);
       rowKeyOrder.push(rowKey);
     }
-
-    // --- Build column key base
     const colKeyBase =
       colsLen === 0 ? "" : cols.map((c) => String(row[c] ?? "N/A")).join("|||");
-    // console.log(colKeyBase);
 
     if (hasValues) {
       for (const { field, agg } of values) {
@@ -111,39 +108,37 @@ export function aggregateData(
       // (rowObj[colKey] ??= { rawCount: 0 }).rawCount++;
     }
   }
-  // console.log(colKeysSet);
-  // console.log(tableMap);
   //  Build table in order
   const colKeys = Array.from(colKeysSet);
   const table = rowKeyOrder.map((key) => tableMap.get(key)!);
-  // console.log("Aggregated table before subtotals:", { table });
   //  Add subtotals (if values exist)
-  const tableWithSubtotals = hasValues
+  const subtotalResults = hasValues
     ? insertSubtotalRows(table, rows, colKeys, colAggInfo)
-    : table;
+    : { table, hasSubtotals: false };
+
+  // console.log("Base Table", table);
+  // console.log("Grand Total", grandTotals);
+  // console.log("colAggInfo", colAggInfo);
+  // console.log("colKeys", colKeys);
+  // console.log("Table With Subtotals", subtotalResults.table);
 
   //  Normalize grand totals in-place
-  if (hasValues) {
-    for (const g of Object.values(grandTotals)) {
-      if (g.validCount === 0) {
-        g.sum = g.min = g.max = null;
-      }
-    }
-  }
-  // console.log("Table aggregation result:", {
-  //   table: tableWithSubtotals,
-  // });
-
-  //  Column widths
-  const widths = Object.fromEntries(colKeys.map((col) => [col, 150]));
+  // if (hasValues) {
+  //   for (const g of Object.values(grandTotals)) {
+  //     if (g.validCount === 0) {
+  //       g.sum = g.min = g.max = null;
+  //     }
+  //   }
+  // }
 
   return {
-    table: tableWithSubtotals,
+    table: subtotalResults.table,
+    hasSubtotals: subtotalResults.hasSubtotals,
+
     grandTotal: hasValues ? grandTotals : null,
     rowGroups: rows,
     colGroups: cols,
     valueCols: colKeys,
-    widths,
     colAggInfo,
   };
 }

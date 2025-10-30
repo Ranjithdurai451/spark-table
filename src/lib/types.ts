@@ -12,14 +12,21 @@ export interface CellStats {
 }
 
 export type DataRow = Record<string, unknown>;
+export interface RowSpanInfo {
+  span: number;
+  isSubtotal: boolean;
+  level: number;
+}
+
 export interface AggregateDataResult {
   table: DataRow[];
   grandTotal: DataRow | null;
   rowGroups: string[];
   colGroups: string[];
   valueCols: string[];
-  widths: Record<string, number>;
+  // widths: Record<string, number>;
   colAggInfo: Record<string, { field: string; agg: string }>;
+  hasSubtotals: boolean;
 }
 export type SpreadsheetRow = Record<string, string | number | boolean | null>;
 export interface HeaderCell {
@@ -31,12 +38,6 @@ export interface ColumnLeaf {
   key: string;
   path: string[];
   leafLabel: string;
-}
-
-export interface RowSpanInfo {
-  span: number;
-  isSubtotal: boolean;
-  level: number;
 }
 
 export interface PivotEstimation {
@@ -66,4 +67,5 @@ export interface PivotComputationResult {
   hasGrandTotal: boolean;
   hasOnlyRows: boolean;
   rowSpans: Record<number, RowSpanInfo[]>;
+  hasSubtotals: boolean;
 }

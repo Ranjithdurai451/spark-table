@@ -24,7 +24,7 @@ export function computeRowSpans(
       level: subtotalLevel,
     }));
   }
-
+  // console.log("Base Span", spans);
   // Compute spans for each grouping level
   for (let lvl = 0; lvl < groupFieldsLen; lvl++) {
     let i = 0;
@@ -82,7 +82,7 @@ export function computeRowSpans(
       i = j;
     }
   }
-
+  // console.log("Computed spans", spans);
   return spans;
 }
 
@@ -103,7 +103,6 @@ export function buildColHeaderTree(
 
   const columnData = new Array(leafColsLen);
   let hasValueLevel = false;
-
   // Parse leaf columns into structured components
   for (let i = 0; i < leafColsLen; i++) {
     const key = leafCols[i];
@@ -114,6 +113,8 @@ export function buildColHeaderTree(
     if (valueLabel) hasValueLevel = true;
     columnData[i] = { key, parts, valueLabel };
   }
+  // console.log("columnData", columnData);
+  // console.log("leafs", leafCols);
 
   const totalLevels = hasValueLevel ? groupFieldsLen + 1 : groupFieldsLen;
   const headerRows: HeaderCell[][] = new Array(totalLevels);
@@ -161,6 +162,7 @@ export function buildColHeaderTree(
 
     headerRows[level] = headerRow;
   }
+  // console.log("headerRows", headerRows);
 
   return { headerRows, leafCols };
 }
