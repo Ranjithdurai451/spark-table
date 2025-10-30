@@ -14,6 +14,8 @@ export function aggregateData(
   const dataLen = data.length;
   if (dataLen === 0) {
     return {
+      totalGroups: 0,
+      topLevelGroups: [],
       hasSubtotals: false,
       table: [],
       grandTotal: null,
@@ -114,7 +116,7 @@ export function aggregateData(
   //  Add subtotals (if values exist)
   const subtotalResults = hasValues
     ? insertSubtotalRows(table, rows, colKeys, colAggInfo)
-    : { table, hasSubtotals: false };
+    : { table, hasSubtotals: false, topLevelGroups: [], totalGroups: 0 };
 
   // console.log("Base Table", table);
   // console.log("Grand Total", grandTotals);
@@ -134,11 +136,13 @@ export function aggregateData(
   return {
     table: subtotalResults.table,
     hasSubtotals: subtotalResults.hasSubtotals,
-
     grandTotal: hasValues ? grandTotals : null,
     rowGroups: rows,
     colGroups: cols,
     valueCols: colKeys,
     colAggInfo,
+    // groupMetadata: subtotalResults,
+    topLevelGroups: subtotalResults.topLevelGroups,
+    totalGroups: subtotalResults.totalGroups,
   };
 }

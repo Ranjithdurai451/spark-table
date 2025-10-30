@@ -24,6 +24,8 @@ export interface AggregateDataResult {
   rowGroups: string[];
   colGroups: string[];
   valueCols: string[];
+  topLevelGroups: GroupInfo[];
+  totalGroups: number;
   // widths: Record<string, number>;
   colAggInfo: Record<string, { field: string; agg: string }>;
   hasSubtotals: boolean;
@@ -66,6 +68,25 @@ export interface PivotComputationResult {
   colAggInfo: Record<string, { field: string; agg: string }>;
   hasGrandTotal: boolean;
   hasOnlyRows: boolean;
-  rowSpans: Record<number, RowSpanInfo[]>;
+  // rowSpans: Record<number, RowSpanInfo[]>;
+  topLevelGroups: GroupInfo[];
+  totalGroups: number;
   hasSubtotals: boolean;
 }
+
+export type GroupInfo = {
+  level: number;
+  key: string;
+  startIndex: number;
+  endIndex: number;
+  rowCount: number;
+  hasSubtotal: boolean;
+  parentKey: string | null;
+};
+
+export type SubtotalResult = {
+  table: any[];
+  hasSubtotals: boolean;
+  topLevelGroups: GroupInfo[];
+  totalGroups: number;
+};

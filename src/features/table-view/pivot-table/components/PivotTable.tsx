@@ -10,6 +10,7 @@ import { getAggValue, getVisibleRows } from "../core/pivot-helpers";
 import { useShallow } from "zustand/shallow";
 import { PivotTableRow } from "./PivotTableRow";
 import type { PivotComputationResult } from "@/lib/types";
+import { computeRowSpans } from "../core/pivot-grouping";
 
 export const PivotTable = () => {
   const { rows, columns, values, showRaw, previousState } = usePivotStore(
@@ -119,20 +120,33 @@ export const PivotTable = () => {
     colAggInfo,
     hasGrandTotal,
     hasOnlyRows,
-    rowSpans,
     hasSubtotals,
-  } = result as PivotComputationResult;
-  const pageSize = 50;
+    topLevelGroups,
+    totalGroups,
+  } = result as PivotComputationResult & {
+    groupMetadata?: {
+      topLevelGroups: any[];
+      totalGroups: number;
+    };
+  };
+  console.log("yes", topLevelGroups);
+
+  const useGroupPagination = hasSubtotals && topLevelGroups?.length > 0;
+  const pageSize = useGroupPagination ? 5 : 25; // Number of groups per page
+
   const { visible, startIndex } = getVisibleRows(
     table,
+    topLevelGroups,
     page,
     pageSize,
-    hasSubtotals
+    useGroupPagination
   );
-  // console.log(headerRows);
+
+  const rowSpans = computeRowSpans(visible, rowGroups);
+  const totalForPagination = useGroupPagination ? totalGroups : table.length;
 
   return (
-    <div className="w-full h-full flex flex-col bg-background border border-border overflow-hidden rounded-lg">
+    <div className="w-full h-full flex flex-col bg-background border border-border overflow-hidden ">
       {columnLimitInfo?.columnsLimited && (
         <div className="bg-yellow-500/10 border-b border-yellow-500/20 px-4 py-2 flex items-center gap-2">
           <Info className="h-4 w-4 text-yellow-600" />
@@ -184,9 +198,9 @@ export const PivotTable = () => {
           <tbody>
             {visible.map((row, i) => (
               <PivotTableRow
-                key={i}
+                key={startIndex + i}
                 row={row}
-                rowIndex={i + startIndex}
+                rowIndex={i}
                 rowGroups={rowGroups}
                 rowSpans={rowSpans}
                 leafCols={leafCols}
@@ -246,13 +260,15 @@ export const PivotTable = () => {
         </table>
       </div>
 
-      {table.length > pageSize && (
+      {totalForPagination > pageSize && (
         <div className="border-t border-border">
           <Pagination
             page={page}
             pageSize={pageSize}
-            total={table.length}
+            total={totalForPagination}
             setPage={setPage}
+            isGroupBased={useGroupPagination}
+            totalItems={useGroupPagination ? table.length : undefined}
           />
         </div>
       )}

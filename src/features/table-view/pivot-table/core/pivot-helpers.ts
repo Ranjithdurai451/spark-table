@@ -1,4 +1,4 @@
-import type { RowSpanInfo, ValueItem } from "@/lib/types";
+import type { GroupInfo } from "@/lib/types";
 
 export function getAggValue(
   rowData: any,
@@ -94,54 +94,40 @@ export const inferFields = (rows: any[]) =>
 
 type Row = { [key: string]: any; __isSubtotal?: boolean };
 
-export type RowSpans = Record<number, RowSpanInfo[]>;
-
 export const getVisibleRows = (
   table: Row[],
+  topLevelGroups: GroupInfo[],
   page: number,
   pageSize: number,
-  hasSubtotals: boolean
-): { visible: Row[]; startIndex: number } => {
-  const start = (page - 1) * pageSize;
-  const end = page * pageSize;
-
-  // Normal pagination
-  if (!hasSubtotals) {
+  useGroupPagination: boolean
+): { visible: Row[]; startIndex: number; endIndex: number } => {
+  if (!useGroupPagination) {
+    // Fallback to simple pagination
+    const start = (page - 1) * pageSize;
+    const end = Math.min(start + pageSize, table.length);
     return {
-      visible: table.slice(start, Math.min(end, table.length)),
+      visible: table.slice(start, end),
       startIndex: start,
+      endIndex: end - 1,
     };
   }
 
-  // When subtotals exist:
-  // Ensure we start from the beginning of a group and end after its subtotal
-  let s = start;
-  let e = Math.min(table.length, end);
+  // Calculate which groups should be on this page
+  const groupStart = (page - 1) * pageSize;
+  const groupEnd = Math.min(groupStart + pageSize, topLevelGroups.length);
 
-  // 1️⃣ Move `s` backward to start of a group (if current row isn't start)
-  while (s > 0 && !table[s - 1]?.__isSubtotal) {
-    // If previous rows are still part of a group, step back
-    const prev = table[s - 1];
-    const curr = table[s];
-    // Stop if we reached a subtotal or the start of a new group
-    if (prev.__isSubtotal) break;
-    s--;
+  if (groupStart >= topLevelGroups.length) {
+    return { visible: [], startIndex: 0, endIndex: 0 };
   }
 
-  // 2️⃣ Move `e` forward to include group subtotal
-  while (e < table.length && !table[e - 1]?.__isSubtotal) {
-    const curr = table[e - 1];
-    if (curr.__isSubtotal) break;
-    e++;
-    // stop if next is subtotal (end of group)
-    if (table[e]?.__isSubtotal) {
-      e++;
-      break;
-    }
-  }
+  const firstGroup = topLevelGroups[groupStart];
+  const lastGroup = topLevelGroups[groupEnd - 1];
+  const startIndex = firstGroup.startIndex;
+  const endIndex = lastGroup.endIndex;
 
   return {
-    visible: table.slice(s, Math.min(e, table.length)),
-    startIndex: s,
+    visible: table.slice(startIndex, endIndex + 1),
+    startIndex,
+    endIndex,
   };
 };

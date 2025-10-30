@@ -12,7 +12,7 @@ export const DefaultTable = () => {
   );
 
   const [page, setPage] = useState(1);
-  const pageSize = 50;
+  const pageSize = 25;
 
   const totalRows = data.length;
   const startIdx = (page - 1) * pageSize;

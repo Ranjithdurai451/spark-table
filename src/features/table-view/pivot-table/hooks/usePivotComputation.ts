@@ -6,7 +6,7 @@ import {
   limitColumnsForRendering,
   MAX_RENDER_COLUMNS,
 } from "../core/pivot-size-estimation";
-import { computeRowSpans, buildColHeaderTree } from "../core/pivot-grouping";
+import { buildColHeaderTree } from "../core/pivot-grouping";
 import { useShallow } from "zustand/shallow";
 import type {
   AggregateDataResult,
@@ -81,11 +81,6 @@ export const usePivotComputation = () => {
           values
         );
 
-        const rowSpans = computeRowSpans(
-          aggregated.table,
-          aggregated.rowGroups
-        );
-
         const { headerRows, leafCols } = buildColHeaderTree(
           aggregated.valueCols,
           aggregated.colGroups
@@ -95,8 +90,10 @@ export const usePivotComputation = () => {
           !!aggregated.grandTotal && aggregated.rowGroups.length > 0;
         const hasOnlyRows =
           aggregated.rowGroups.length > 0 && leafCols.length === 0;
-
+        console.log("aggre", aggregated);
         const fullResult: PivotComputationResult = {
+          topLevelGroups: aggregated.topLevelGroups,
+          totalGroups: aggregated.totalGroups,
           hasSubtotals: aggregated.hasSubtotals,
           table: aggregated.table,
           grandTotal: aggregated.grandTotal,
@@ -107,7 +104,7 @@ export const usePivotComputation = () => {
           colAggInfo: aggregated.colAggInfo,
           hasGrandTotal,
           hasOnlyRows,
-          rowSpans,
+          // rowSpans,
         };
 
         setColumnLimitInfo(info);

@@ -1,74 +1,4 @@
-import type { CellStats } from "@/lib/types";
-
-// export function computeAggregatedStats(statsList: CellStats[]): CellStats {
-//   let totalRaw = 0;
-//   let totalValid = 0;
-//   let totalSum = 0;
-//   let minVal = Infinity;
-//   let maxVal = -Infinity;
-
-//   for (const s of statsList) {
-//     if (!s) continue;
-
-//     totalRaw += s.rawCount ?? 0;
-//     totalValid += s.validCount ?? 0;
-
-//     if (s.validCount > 0) {
-//       totalSum += s.sum ?? 0;
-//       if (s.min !== null && s.min < minVal) minVal = s.min;
-//       if (s.max !== null && s.max > maxVal) maxVal = s.max;
-//     }
-//   }
-
-//   const hasValid = totalValid > 0;
-
-//   return {
-//     rawCount: totalRaw,
-//     validCount: totalValid,
-//     sum: hasValid ? totalSum : null,
-//     min: hasValid && minVal < Infinity ? minVal : null,
-//     max: hasValid && maxVal > -Infinity ? maxVal : null,
-//   };
-// }
-
-// function makeSubtotalRow(
-//   level: number,
-//   groupKey: string,
-//   parentValues: Record<string, any>,
-//   rowGroups: string[],
-//   valueCols: string[],
-//   colAggInfo: Record<string, { field: string; agg: string }>,
-//   rows: any[]
-// ) {
-//   const subtotalRow: any = {
-//     __isSubtotal: true,
-//     __subtotalLevel: level,
-//     __subtotalLabel: `Total ${groupKey}`,
-//     ...parentValues,
-//     [rowGroups[level]]: `Total ${groupKey}`,
-//   };
-
-//   for (let i = level + 1; i < rowGroups.length; i++) {
-//     subtotalRow[rowGroups[i]] = null;
-//   }
-
-//   for (const colKey of valueCols) {
-//     const aggInfo = colAggInfo[colKey];
-//     if (!aggInfo) {
-//       subtotalRow[colKey] = null;
-//       continue;
-//     }
-
-//     const statsList: CellStats[] = [];
-//     for (const r of rows) {
-//       if (!r.__isSubtotal && r[colKey]) statsList.push(r[colKey]);
-//     }
-
-//     subtotalRow[colKey] = computeAggregatedStats(statsList);
-//   }
-
-//   return subtotalRow;
-// }
+import type { CellStats, GroupInfo, SubtotalResult } from "@/lib/types";
 
 export function makeSubtotalRow(
   level: number,
@@ -86,11 +16,6 @@ export function makeSubtotalRow(
     ...parentValues,
     [rowGroups[level]]: `Total ${groupKey}`,
   };
-
-  // Fill remaining group columns with null
-  // for (let i = level + 1; i < rowGroups.length; i++) {
-  //   subtotalRow[rowGroups[i]] = null;
-  // }
 
   for (const colKey of valueCols) {
     const aggInfo = colAggInfo[colKey];
@@ -139,9 +64,14 @@ export function insertSubtotalRows(
   rowGroups: string[],
   valueCols: string[],
   colAggInfo: Record<string, { field: string; agg: string }>
-): { table: any[]; hasSubtotals: boolean } {
+): SubtotalResult {
   if (rowGroups.length === 0 || data.length === 0) {
-    return { table: data, hasSubtotals: false };
+    return {
+      table: data,
+      hasSubtotals: false,
+      topLevelGroups: [],
+      totalGroups: 0,
+    };
   }
 
   const groupBy = (arr: any[], key: string) => {
@@ -155,11 +85,13 @@ export function insertSubtotalRows(
   };
 
   let hasSubtotals = false;
+  const topLevelGroups: GroupInfo[] = [];
 
   const process = (
     rows: any[],
     level: number,
-    parentValues: Record<string, any>
+    parentValues: Record<string, any>,
+    parentKey: string | null
   ): any[] => {
     if (level >= rowGroups.length) return rows;
 
@@ -169,7 +101,12 @@ export function insertSubtotalRows(
 
     for (const [groupKey, groupRows] of Array.from(groups.entries())) {
       const nextParent = { ...parentValues, [key]: groupKey };
-      const processed = process(groupRows, level + 1, nextParent);
+      const fullGroupKey = parentKey ? `${parentKey}|||${groupKey}` : groupKey;
+
+      // Capture the starting index in the RESULT array
+      const groupStartIndex = result.length;
+
+      const processed = process(groupRows, level + 1, nextParent, fullGroupKey);
       result.push(...processed);
 
       if (processed.length > 1) {
@@ -185,11 +122,31 @@ export function insertSubtotalRows(
         );
         result.push(subtotalRow);
       }
+
+      // Track top-level groups only (level 0)
+      if (level === 0) {
+        const groupEndIndex = result.length - 1;
+        topLevelGroups.push({
+          level,
+          key: groupKey,
+          startIndex: groupStartIndex,
+          endIndex: groupEndIndex,
+          rowCount: groupEndIndex - groupStartIndex + 1,
+          hasSubtotal: processed.length > 1,
+          parentKey,
+        });
+      }
     }
 
     return result;
   };
 
-  const table = process(data, 0, {});
-  return { table, hasSubtotals };
+  const table = process(data, 0, {}, null);
+
+  return {
+    table,
+    hasSubtotals,
+    topLevelGroups,
+    totalGroups: topLevelGroups.length,
+  };
 }
