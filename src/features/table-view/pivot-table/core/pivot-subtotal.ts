@@ -88,8 +88,7 @@ export function insertSubtotalRows(
   const process = (
     rows: any[],
     level: number,
-    parentValues: Record<string, any>,
-    parentKey: string | null
+    parentValues: Record<string, any>
   ): any[] => {
     if (level >= rowGroups.length) return rows;
 
@@ -99,12 +98,10 @@ export function insertSubtotalRows(
 
     for (const [groupKey, groupRows] of Array.from(groups.entries())) {
       const nextParent = { ...parentValues, [key]: groupKey };
-      const fullGroupKey = parentKey ? `${parentKey}|||${groupKey}` : groupKey;
 
-      // Capture the starting index in the RESULT array
       const groupStartIndex = result.length;
 
-      const processed = process(groupRows, level + 1, nextParent, fullGroupKey);
+      const processed = process(groupRows, level + 1, nextParent);
       result.push(...processed);
 
       if (processed.length > 1 && valueCols.length > 0) {
@@ -137,7 +134,7 @@ export function insertSubtotalRows(
     return result;
   };
 
-  const table = process(data, 0, {}, null);
+  const table = process(data, 0, {});
 
   return {
     table,

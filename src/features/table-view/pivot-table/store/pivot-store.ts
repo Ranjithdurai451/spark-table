@@ -1,4 +1,4 @@
-import type { Agg, ValueItem, Zone } from "@/lib/types";
+import type { Agg, AggregationValue, Zone } from "@/lib/types";
 import { create } from "zustand";
 import { inferFields, inferFieldsMetadata } from "../core/pivot-helpers";
 
@@ -12,7 +12,7 @@ export interface PivotState {
 
   rows: string[];
   columns: string[];
-  values: ValueItem[];
+  values: AggregationValue[];
 
   fileName?: string;
   showRaw: boolean;
@@ -20,7 +20,7 @@ export interface PivotState {
   previousState: {
     rows: string[];
     columns: string[];
-    values: ValueItem[];
+    values: AggregationValue[];
   } | null;
 
   // Actions
@@ -120,7 +120,7 @@ export const usePivotStore = create<PivotState>((set, get) => ({
       values: [...state.values],
     };
 
-    let newZoneValue: string[] | ValueItem[] =
+    let newZoneValue: string[] | AggregationValue[] =
       zone === "values"
         ? state.values.filter((v) => v.field !== field)
         : state[zone].filter((f) => f !== field);
@@ -154,7 +154,8 @@ export const usePivotStore = create<PivotState>((set, get) => ({
       values: [...state.values],
     };
 
-    const newZone = zone === "values" ? ([] as ValueItem[]) : ([] as string[]);
+    const newZone =
+      zone === "values" ? ([] as AggregationValue[]) : ([] as string[]);
     const willBeEmpty =
       (zone === "rows" || state.rows.length === 0) &&
       (zone === "columns" || state.columns.length === 0) &&

@@ -18,7 +18,6 @@ import { Tab } from "./Tab";
 import { PanelShell } from "./PanelShell";
 import { DataPanel } from "./DataPanel";
 import { useShallow } from "zustand/shallow";
-// import { add } from "@dnd-kit/utilities";
 
 export const createDragId = (zone: string, field: string) => `${zone}:${field}`;
 export const parseDragId = (id: string) => {
@@ -289,7 +288,6 @@ function DropZoneArea({
   emptyHint: string;
   onClear: () => void;
 }) {
-  // const { removeFromZone } = usePivotStore();
   const removeFromZone = usePivotStore((s) => s.removeFromZone);
   const { setNodeRef, isOver } = useDroppable({ id });
 
@@ -400,11 +398,9 @@ function ValuesZoneArea({
 }
 
 function ValueFieldItem({ value }: { value: { field: string; agg: string } }) {
-  // const { setValueAgg, removeValueField, numericFields } = usePivotStore();
   const { setValueAgg, removeFromZone, numericFields } = usePivotStore(
     useShallow((s) => ({
       setValueAgg: s.setValueAgg,
-      // removeValueField: s.removeValueField,
       removeFromZone: s.removeFromZone,
       numericFields: s.numericFields,
     }))

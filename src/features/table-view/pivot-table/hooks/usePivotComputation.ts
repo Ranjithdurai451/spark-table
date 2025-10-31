@@ -102,7 +102,6 @@ export const usePivotComputation = () => {
           colAggInfo: aggregated.colAggInfo,
           hasGrandTotal,
           hasOnlyRows,
-          // rowSpans,
         };
 
         setColumnLimitInfo(info);

@@ -34,8 +34,6 @@ export function estimatePivotSize(
       : uniqueCombos;
 
   const estimatedColumns = estimatedCombos * (values.length || 1);
-  // console.log(`Estimated unique column combinations: ${estimatedCombos}`);
-  // console.log(`Estimated total columns: ${estimatedColumns}`);
   return {
     estimatedColumns,
     shouldWarn: estimatedColumns > COLUMN_WARNING_THRESHOLD,

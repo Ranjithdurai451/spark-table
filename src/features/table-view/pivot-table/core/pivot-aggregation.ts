@@ -3,7 +3,7 @@ import type {
   CellStats,
   AggregateDataResult,
 } from "@/lib/types";
-import { insertSubtotalRows } from "./pivot-total";
+import { insertSubtotalRows } from "./pivot-subtotal";
 
 export function aggregateData(
   data: any[],
@@ -112,17 +112,8 @@ export function aggregateData(
   //  Build table in order
   const colKeys = Array.from(colKeysSet);
   const table = rowKeyOrder.map((key) => tableMap.get(key)!);
-  //  Add subtotals (if values exist)
-  // const subtotalResults = hasValues
-  //   ? insertSubtotalRows(table, rows, colKeys, colAggInfo)
-  //   : { table, hasSubtotals: false, topLevelGroups: [], totalGroups: 0 };
-  const subtotalResults = insertSubtotalRows(table, rows, colKeys, colAggInfo);
 
-  // console.log("Base Table", table);
-  // console.log("Grand Total", grandTotals);
-  // console.log("colAggInfo", colAggInfo);
-  // console.log("colKeys", colKeys);
-  // console.log("Table With Subtotals", subtotalResults.table);
+  const subtotalResults = insertSubtotalRows(table, rows, colKeys, colAggInfo);
 
   //  Normalize grand totals in-place
   // if (hasValues) {
@@ -132,7 +123,8 @@ export function aggregateData(
   //     }
   //   }
   // }
-  console.log(subtotalResults.topLevelGroups);
+
+  console.log(subtotalResults.table);
   return {
     table: subtotalResults.table,
     grandTotal: hasValues ? grandTotals : null,
@@ -140,7 +132,6 @@ export function aggregateData(
     colGroups: cols,
     valueCols: colKeys,
     colAggInfo,
-    // groupMetadata: subtotalResults,
     topLevelGroups: subtotalResults.topLevelGroups,
     totalGroups: subtotalResults.totalGroups,
   };

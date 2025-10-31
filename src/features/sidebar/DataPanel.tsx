@@ -10,8 +10,6 @@ import { createDragId } from "./SidebarControls";
 import { useShallow } from "zustand/shallow";
 
 export const DataPanel = ({ fields }: { fields: string[] }) => {
-  // const { getFieldZone, addToZone, removeFromZone, setShowRaw, clearZone } =
-  //   usePivotStore();
   const {
     showRaw,
     getFieldZone,
