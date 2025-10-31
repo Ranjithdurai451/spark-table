@@ -16,7 +16,6 @@ export function aggregateData(
     return {
       totalGroups: 0,
       topLevelGroups: [],
-      hasSubtotals: false,
       table: [],
       grandTotal: null,
       rowGroups: rows,
@@ -114,9 +113,10 @@ export function aggregateData(
   const colKeys = Array.from(colKeysSet);
   const table = rowKeyOrder.map((key) => tableMap.get(key)!);
   //  Add subtotals (if values exist)
-  const subtotalResults = hasValues
-    ? insertSubtotalRows(table, rows, colKeys, colAggInfo)
-    : { table, hasSubtotals: false, topLevelGroups: [], totalGroups: 0 };
+  // const subtotalResults = hasValues
+  //   ? insertSubtotalRows(table, rows, colKeys, colAggInfo)
+  //   : { table, hasSubtotals: false, topLevelGroups: [], totalGroups: 0 };
+  const subtotalResults = insertSubtotalRows(table, rows, colKeys, colAggInfo);
 
   // console.log("Base Table", table);
   // console.log("Grand Total", grandTotals);
@@ -132,10 +132,9 @@ export function aggregateData(
   //     }
   //   }
   // }
-
+  console.log(subtotalResults.topLevelGroups);
   return {
     table: subtotalResults.table,
-    hasSubtotals: subtotalResults.hasSubtotals,
     grandTotal: hasValues ? grandTotals : null,
     rowGroups: rows,
     colGroups: cols,

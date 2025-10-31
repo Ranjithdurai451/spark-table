@@ -31,6 +31,7 @@ export const PivotTable = () => {
   const [page, setPage] = useState(1);
   const [showWarning, setShowWarning] = useState(false);
   const [warningHandled, setWarningHandled] = useState(false);
+  const [pageSize, setPageSize] = useState(5);
 
   const {
     result,
@@ -41,6 +42,18 @@ export const PivotTable = () => {
     compute,
     isPending,
   } = usePivotComputation();
+
+  const topLevelGroups = result?.topLevelGroups ?? [];
+  const useGroupPagination = topLevelGroups.length > 0;
+
+  // Update pageSize when pagination mode changes
+  useEffect(() => {
+    const newPageSize = useGroupPagination ? 5 : 25;
+    if (pageSize !== newPageSize) {
+      setPageSize(newPageSize);
+      setPage(1);
+    }
+  }, [useGroupPagination]);
 
   useEffect(() => {
     const prevCols = previousState?.columns ?? [];
@@ -120,21 +133,10 @@ export const PivotTable = () => {
     colAggInfo,
     hasGrandTotal,
     hasOnlyRows,
-    hasSubtotals,
-    topLevelGroups,
     totalGroups,
-  } = result as PivotComputationResult & {
-    groupMetadata?: {
-      topLevelGroups: any[];
-      totalGroups: number;
-    };
-  };
-  console.log("yes", topLevelGroups);
+  } = result as PivotComputationResult;
 
-  const useGroupPagination = hasSubtotals && topLevelGroups?.length > 0;
-  const pageSize = useGroupPagination ? 5 : 25; // Number of groups per page
-
-  const { visible, startIndex } = getVisibleRows(
+  const { visible } = getVisibleRows(
     table,
     topLevelGroups,
     page,
@@ -198,7 +200,7 @@ export const PivotTable = () => {
           <tbody>
             {visible.map((row, i) => (
               <PivotTableRow
-                key={startIndex + i}
+                key={i}
                 row={row}
                 rowIndex={i}
                 rowGroups={rowGroups}
@@ -267,6 +269,10 @@ export const PivotTable = () => {
             pageSize={pageSize}
             total={totalForPagination}
             setPage={setPage}
+            setPageSize={(size) => {
+              setPageSize(size);
+              setPage(1);
+            }}
             isGroupBased={useGroupPagination}
             totalItems={useGroupPagination ? table.length : undefined}
           />

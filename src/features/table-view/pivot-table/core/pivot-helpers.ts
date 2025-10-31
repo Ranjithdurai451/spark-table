@@ -100,15 +100,13 @@ export const getVisibleRows = (
   page: number,
   pageSize: number,
   useGroupPagination: boolean
-): { visible: Row[]; startIndex: number; endIndex: number } => {
+): { visible: Row[] } => {
   if (!useGroupPagination) {
     // Fallback to simple pagination
     const start = (page - 1) * pageSize;
     const end = Math.min(start + pageSize, table.length);
     return {
       visible: table.slice(start, end),
-      startIndex: start,
-      endIndex: end - 1,
     };
   }
 
@@ -117,7 +115,7 @@ export const getVisibleRows = (
   const groupEnd = Math.min(groupStart + pageSize, topLevelGroups.length);
 
   if (groupStart >= topLevelGroups.length) {
-    return { visible: [], startIndex: 0, endIndex: 0 };
+    return { visible: [] };
   }
 
   const firstGroup = topLevelGroups[groupStart];
@@ -127,7 +125,5 @@ export const getVisibleRows = (
 
   return {
     visible: table.slice(startIndex, endIndex + 1),
-    startIndex,
-    endIndex,
   };
 };

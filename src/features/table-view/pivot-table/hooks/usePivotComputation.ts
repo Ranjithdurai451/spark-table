@@ -90,11 +90,9 @@ export const usePivotComputation = () => {
           !!aggregated.grandTotal && aggregated.rowGroups.length > 0;
         const hasOnlyRows =
           aggregated.rowGroups.length > 0 && leafCols.length === 0;
-        console.log("aggre", aggregated);
         const fullResult: PivotComputationResult = {
           topLevelGroups: aggregated.topLevelGroups,
           totalGroups: aggregated.totalGroups,
-          hasSubtotals: aggregated.hasSubtotals,
           table: aggregated.table,
           grandTotal: aggregated.grandTotal,
           rowGroups: aggregated.rowGroups,

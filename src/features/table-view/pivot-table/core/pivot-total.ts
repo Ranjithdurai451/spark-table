@@ -65,10 +65,9 @@ export function insertSubtotalRows(
   valueCols: string[],
   colAggInfo: Record<string, { field: string; agg: string }>
 ): SubtotalResult {
-  if (rowGroups.length === 0 || data.length === 0) {
+  if (rowGroups.length === 0) {
     return {
       table: data,
-      hasSubtotals: false,
       topLevelGroups: [],
       totalGroups: 0,
     };
@@ -109,7 +108,7 @@ export function insertSubtotalRows(
       const processed = process(groupRows, level + 1, nextParent, fullGroupKey);
       result.push(...processed);
 
-      if (processed.length > 1) {
+      if (processed.length > 1 && valueCols.length > 0) {
         hasSubtotals = true;
         const subtotalRow = makeSubtotalRow(
           level,
@@ -133,7 +132,6 @@ export function insertSubtotalRows(
           endIndex: groupEndIndex,
           rowCount: groupEndIndex - groupStartIndex + 1,
           hasSubtotal: processed.length > 1,
-          parentKey,
         });
       }
     }
@@ -145,7 +143,6 @@ export function insertSubtotalRows(
 
   return {
     table,
-    hasSubtotals,
     topLevelGroups,
     totalGroups: topLevelGroups.length,
   };

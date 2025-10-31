@@ -12,13 +12,13 @@ export const DefaultTable = () => {
   );
 
   const [page, setPage] = useState(1);
-  const pageSize = 25;
+  const [pageSize, setPageSize] = useState(25);
 
   const totalRows = data.length;
   const startIdx = (page - 1) * pageSize;
   const pagedData = useMemo(
     () => data.slice(startIdx, startIdx + pageSize),
-    [data, startIdx]
+    [data, startIdx, pageSize]
   );
 
   if (data.length === 0) return null;
@@ -75,6 +75,7 @@ export const DefaultTable = () => {
         pageSize={pageSize}
         total={totalRows}
         setPage={setPage}
+        setPageSize={setPageSize}
       />
     </div>
   );
