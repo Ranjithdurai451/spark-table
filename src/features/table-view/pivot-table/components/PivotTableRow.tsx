@@ -69,10 +69,7 @@ export const PivotTableRow = ({
 
       {leafCols.map((col, colIndex) => {
         const value = getAggValue(row, col, colAggInfo, values);
-        const isPlaceholder = value === "-";
         const isNum = typeof value === "number" && isFinite(value);
-        const isEmpty =
-          value === null || value === undefined || (!isNum && !isPlaceholder);
 
         return (
           <td
@@ -82,14 +79,12 @@ export const PivotTableRow = ({
             } ${isSubtotal ? "font-semibold" : ""}`}
           >
             <span className="truncate block">
-              {isEmpty
-                ? "-"
-                : isNum
-                ? (value as number).toLocaleString(undefined, {
+              {isNum
+                ? value.toLocaleString(undefined, {
                     maximumFractionDigits: 2,
                     minimumFractionDigits: 0,
                   })
-                : String(value)}
+                : value ?? "-"}
             </span>
           </td>
         );
