@@ -83,7 +83,6 @@ export function insertSubtotalRows(
     return map;
   };
 
-  let hasSubtotals = false;
   const topLevelGroups: GroupInfo[] = [];
 
   const process = (
@@ -109,7 +108,6 @@ export function insertSubtotalRows(
       result.push(...processed);
 
       if (processed.length > 1 && valueCols.length > 0) {
-        hasSubtotals = true;
         const subtotalRow = makeSubtotalRow(
           level,
           groupKey,
