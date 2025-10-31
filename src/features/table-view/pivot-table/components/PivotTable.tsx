@@ -44,7 +44,7 @@ export const PivotTable = () => {
   } = usePivotComputation();
 
   const topLevelGroups = result?.topLevelGroups ?? [];
-  const useGroupPagination = topLevelGroups.length > 0;
+  const useGroupPagination = topLevelGroups.length > 0 && rows.length > 1;
 
   // Update pageSize when pagination mode changes
   useEffect(() => {
