@@ -15,6 +15,7 @@ export function makeSubtotalRow(
     __subtotalLabel: `Total ${groupKey}`,
     ...parentValues,
     [rowGroups[level]]: `Total ${groupKey}`,
+    // key: groupKey,
   };
 
   for (const colKey of valueCols) {

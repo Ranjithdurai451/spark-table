@@ -111,7 +111,6 @@ export function buildColHeaderTree(
     if (valueLabel) hasValueLevel = true;
     columnData[i] = { key, parts, valueLabel };
   }
-
   const totalLevels = hasValueLevel ? groupFieldsLen + 1 : groupFieldsLen;
   const headerRows: HeaderCell[][] = new Array(totalLevels);
 
@@ -125,8 +124,6 @@ export function buildColHeaderTree(
         level === groupFieldsLen && hasValueLevel
           ? columnData[i].valueLabel
           : columnData[i].parts[level] || "N/A";
-
-      let span = 1;
       let j = i + 1;
 
       while (j < leafColsLen) {
@@ -148,11 +145,10 @@ export function buildColHeaderTree(
 
         if (!previousLevelsMatch) break;
 
-        span++;
         j++;
       }
 
-      headerRow.push({ label: currentLabel, colSpan: span });
+      headerRow.push({ label: currentLabel, colSpan: j - i });
       i = j;
     }
 

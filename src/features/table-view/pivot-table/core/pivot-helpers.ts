@@ -7,7 +7,6 @@ export function getAggValue(
   values: { field: string; agg: string }[]
 ): number | string | null {
   const cell = rowData[colKey];
-  if (cell === "-") return "-";
   if (!cell || typeof cell !== "object") return null;
 
   const stats = cell as any;
@@ -99,31 +98,40 @@ export const getVisibleRows = (
   topLevelGroups: GroupInfo[],
   page: number,
   pageSize: number,
-  useGroupPagination: boolean
+  useGroupPagination: boolean,
+  grandTotal: Row | null
 ): { visible: Row[] } => {
+  let visible: Row[] = [];
+
   if (!useGroupPagination) {
     // Fallback to simple pagination
     const start = (page - 1) * pageSize;
     const end = Math.min(start + pageSize, table.length);
-    return {
-      visible: table.slice(start, end),
+    visible = table.slice(start, end);
+  } else {
+    // Calculate which groups should be on this page
+    const groupStart = (page - 1) * pageSize;
+    const groupEnd = Math.min(groupStart + pageSize, topLevelGroups.length);
+
+    if (groupStart >= topLevelGroups.length) {
+      visible = [];
+    } else {
+      const firstGroup = topLevelGroups[groupStart];
+      const lastGroup = topLevelGroups[groupEnd - 1];
+      const startIndex = firstGroup.startIndex;
+      const endIndex = lastGroup.endIndex;
+      visible = table.slice(startIndex, endIndex + 1);
+    }
+  }
+
+  //  Always append grand total row if it exists
+  if (grandTotal) {
+    const grandTotalRow = {
+      isGrandTotal: true,
+      ...grandTotal,
     };
+    visible = [...visible, grandTotalRow];
   }
 
-  // Calculate which groups should be on this page
-  const groupStart = (page - 1) * pageSize;
-  const groupEnd = Math.min(groupStart + pageSize, topLevelGroups.length);
-
-  if (groupStart >= topLevelGroups.length) {
-    return { visible: [] };
-  }
-
-  const firstGroup = topLevelGroups[groupStart];
-  const lastGroup = topLevelGroups[groupEnd - 1];
-  const startIndex = firstGroup.startIndex;
-  const endIndex = lastGroup.endIndex;
-
-  return {
-    visible: table.slice(startIndex, endIndex + 1),
-  };
+  return { visible };
 };

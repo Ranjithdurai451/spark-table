@@ -124,7 +124,7 @@ export function aggregateData(
   //   }
   // }
 
-  console.log(subtotalResults.table);
+  // console.log(subtotalResults.table);
   return {
     table: subtotalResults.table,
     grandTotal: hasValues ? grandTotals : null,

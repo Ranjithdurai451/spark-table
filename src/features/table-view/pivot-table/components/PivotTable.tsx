@@ -6,7 +6,7 @@ import { Info } from "lucide-react";
 import { usePivotComputation } from "../hooks/usePivotComputation";
 import { PivotLoading } from "./PivotLoading";
 import { PivotError } from "./PivotError";
-import { getAggValue, getVisibleRows } from "../core/pivot-helpers";
+import { getVisibleRows } from "../core/pivot-helpers";
 import { useShallow } from "zustand/shallow";
 import { PivotTableRow } from "./PivotTableRow";
 import type { PivotComputationResult } from "@/lib/types";
@@ -45,7 +45,7 @@ export const PivotTable = () => {
 
   const topLevelGroups = result?.topLevelGroups ?? [];
   const useGroupPagination = topLevelGroups.length > 0 && rows.length > 1;
-
+  // const useGroupPagination = false;
   // Update pageSize when pagination mode changes
   useEffect(() => {
     const newPageSize = useGroupPagination ? 5 : 25;
@@ -131,7 +131,6 @@ export const PivotTable = () => {
     leafCols,
     headerRows,
     colAggInfo,
-    hasGrandTotal,
     hasOnlyRows,
     totalGroups,
   } = result as PivotComputationResult;
@@ -141,9 +140,9 @@ export const PivotTable = () => {
     topLevelGroups,
     page,
     pageSize,
-    useGroupPagination
+    useGroupPagination,
+    grandTotal
   );
-
   const rowSpans = computeRowSpans(visible, rowGroups);
   const totalForPagination = useGroupPagination ? totalGroups : table.length;
 
@@ -211,54 +210,6 @@ export const PivotTable = () => {
               />
             ))}
           </tbody>
-
-          {hasGrandTotal && (
-            <tfoot className="sticky bottom-0 z-10 bg-muted/80 backdrop-blur-sm">
-              <tr className="border-t-2 border-border">
-                {rowGroups.map((col, groupIndex) => {
-                  if (groupIndex > 0) return null;
-                  const displayValue = grandTotal?.[col] ?? "Grand Total";
-                  return (
-                    <td
-                      key={`grandtotal-group-${groupIndex}`}
-                      colSpan={rowGroups.length}
-                      className="px-3 py-2.5 text-xs font-bold border-r border-b border-border min-w-[200px] text-left"
-                    >
-                      <span className="truncate block">{displayValue}</span>
-                    </td>
-                  );
-                })}
-
-                {leafCols.map((col, colIndex) => {
-                  const value = getAggValue(
-                    grandTotal,
-                    col,
-                    colAggInfo,
-                    values
-                  );
-                  const isNum = typeof value === "number" && isFinite(value);
-
-                  return (
-                    <td
-                      key={`grandtotal-data-${colIndex}`}
-                      className={`px-3 py-2.5 text-center text-xs font-bold border-r border-b border-border min-w-[150px] ${
-                        isNum ? "font-mono" : ""
-                      }`}
-                    >
-                      <span className="truncate block">
-                        {isNum
-                          ? value.toLocaleString(undefined, {
-                              maximumFractionDigits: 2,
-                              minimumFractionDigits: 0,
-                            })
-                          : value ?? "—"}
-                      </span>
-                    </td>
-                  );
-                })}
-              </tr>
-            </tfoot>
-          )}
         </table>
       </div>
 
