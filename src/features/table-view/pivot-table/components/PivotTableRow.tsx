@@ -53,19 +53,33 @@ export const PivotTableRow = ({
 
         if (!spanInfo || spanInfo.span === 0) return null;
 
-        // Handle subtotal
         if (isSubtotal && groupIndex === subtotalLevel) {
+          // Handle subtotal
           const colSpan = rowGroups.length - subtotalLevel;
           const displayValue = row.__subtotalLabel || "Total";
           return (
-            <td
-              key={`row-${rowIndex}-group-${groupIndex}`}
-              rowSpan={1}
-              colSpan={colSpan - 1}
-              className="px-3 py-2 text-xs border-r border-b border-border min-w-[200px] font-semibold text-left"
-            >
-              <span className="truncate block">{displayValue}</span>
-            </td>
+            <>
+              {/* {isSubtotal && rowIndex == 0 && groupIndex == 0 && (
+                <>
+                  <td
+                    key={`row-${rowIndex}-group-${groupIndex}`}
+                    rowSpan={1}
+                    colSpan={1}
+                    className="px-3 bg-background py-2 text-xs border-r border-b border-border min-w-[200px] text-center"
+                  >
+                    <span className="truncate block">{row.ParentKey}</span>
+                  </td>
+                </>
+              )} */}
+              <td
+                key={`row-${rowIndex}-group-${groupIndex}`}
+                rowSpan={1}
+                colSpan={colSpan - 1}
+                className="px-3 py-2 text-xs border-r border-b border-border min-w-[200px] font-semibold text-left"
+              >
+                <span className="truncate block">{displayValue}</span>
+              </td>
+            </>
           );
         }
 
