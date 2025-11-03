@@ -88,7 +88,7 @@ export const PivotTableRow = ({
         const displayValue =
           cellValue !== undefined && cellValue !== null && cellValue !== ""
             ? String(cellValue)
-            : "—";
+            : "-";
         return (
           <td
             key={`row-${rowIndex}-group-${groupIndex}`}
@@ -120,7 +120,7 @@ export const PivotTableRow = ({
                     maximumFractionDigits: 2,
                     minimumFractionDigits: 0,
                   })
-                : value ?? "—"}
+                : value ?? "-"}
             </span>
           </td>
         );
