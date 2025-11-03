@@ -32,6 +32,7 @@ export const PivotTable = () => {
   const [showWarning, setShowWarning] = useState(false);
   const [warningHandled, setWarningHandled] = useState(false);
   const [pageSize, setPageSize] = useState(5);
+  const [useGroupPagination, setUseGroupPagination] = useState(false);
 
   const {
     result,
@@ -44,9 +45,8 @@ export const PivotTable = () => {
   } = usePivotComputation();
 
   const topLevelGroups = result?.topLevelGroups ?? [];
-  const useGroupPagination = topLevelGroups.length > 0 && rows.length > 1;
-  // const useGroupPagination = false;
-  // Update pageSize when pagination mode changes
+
+  //  Adjust default page size when pagination mode changes
   useEffect(() => {
     const newPageSize = useGroupPagination ? 5 : 25;
     if (pageSize !== newPageSize) {
@@ -55,6 +55,7 @@ export const PivotTable = () => {
     }
   }, [useGroupPagination]);
 
+  //  Reset warning if columns/values changed
   useEffect(() => {
     const prevCols = previousState?.columns ?? [];
     const prevVals = previousState?.values ?? [];
@@ -72,6 +73,7 @@ export const PivotTable = () => {
     }
   }, [columns, valueFields]);
 
+  //  Trigger pivot computation or warning dialog
   useEffect(() => {
     if (showRaw || (!rows.length && !columns.length && !valueFields)) {
       reset();
@@ -133,6 +135,8 @@ export const PivotTable = () => {
     colAggInfo,
     hasOnlyRows,
     totalGroups,
+    hasSubtotals,
+    normalRowsLength,
   } = result as PivotComputationResult;
 
   const { visible } = getVisibleRows(
@@ -141,13 +145,17 @@ export const PivotTable = () => {
     page,
     pageSize,
     useGroupPagination,
-    grandTotal
+    grandTotal,
+    hasSubtotals
   );
+
   const rowSpans = computeRowSpans(visible, rowGroups);
-  const totalForPagination = useGroupPagination ? totalGroups : table.length;
+  const totalForPagination = useGroupPagination
+    ? totalGroups
+    : normalRowsLength;
 
   return (
-    <div className="w-full h-full flex flex-col bg-background border border-border overflow-hidden ">
+    <div className="w-full h-full flex flex-col bg-background border border-border overflow-hidden rounded-lg">
       {columnLimitInfo?.columnsLimited && (
         <div className="bg-yellow-500/10 border-b border-yellow-500/20 px-4 py-2 flex items-center gap-2">
           <Info className="h-4 w-4 text-yellow-600" />
@@ -213,6 +221,7 @@ export const PivotTable = () => {
         </table>
       </div>
 
+      {/* 🔹 Pagination Section */}
       {totalForPagination > pageSize && (
         <div className="border-t border-border">
           <Pagination
@@ -225,6 +234,7 @@ export const PivotTable = () => {
               setPage(1);
             }}
             isGroupBased={useGroupPagination}
+            setIsGroupBased={setUseGroupPagination}
             totalItems={useGroupPagination ? table.length : undefined}
           />
         </div>

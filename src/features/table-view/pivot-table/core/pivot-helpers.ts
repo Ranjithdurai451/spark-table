@@ -99,17 +99,55 @@ export const getVisibleRows = (
   page: number,
   pageSize: number,
   useGroupPagination: boolean,
-  grandTotal: Row | null
+  grandTotal: Row | null,
+  hasSubtotals?: boolean
 ): { visible: Row[] } => {
   let visible: Row[] = [];
 
   if (!useGroupPagination) {
-    // Fallback to simple pagination
-    const start = (page - 1) * pageSize;
-    const end = Math.min(start + pageSize, table.length);
-    visible = table.slice(start, end);
+    if (hasSubtotals) {
+      //  row-based pagination that accounts for subtotals
+      const startDataIndex = (page - 1) * pageSize + 1;
+      const endDataIndex = page * pageSize;
+
+      let dataCount = 0;
+      let started = false;
+
+      for (let i = 0; i < table.length; i++) {
+        const row = table[i];
+
+        // Count only real data rows (ignore subtotals in count)
+        if (!row.__isSubtotal) dataCount++;
+
+        // Skip until reaching the starting data index
+        if (!started && dataCount < startDataIndex) continue;
+        started = true;
+
+        visible.push(row);
+
+        // Stop after reaching end index and include following subtotal rows
+        if (dataCount >= endDataIndex) {
+          let j = i + 1;
+          while (
+            j < table.length &&
+            table[j].__isSubtotal &&
+            (table[j].__subtotalLevel ?? -1) >= 0
+          ) {
+            visible.push(table[j]);
+            j++;
+            i = j - 1;
+          }
+          break;
+        }
+      }
+    } else {
+      //  Simple row-based pagination (faster when no subtotals)
+      const start = (page - 1) * pageSize;
+      const end = Math.min(start + pageSize, table.length);
+      visible = table.slice(start, end);
+    }
   } else {
-    // Calculate which groups should be on this page
+    //  Group-based pagination (default for grouped mode)
     const groupStart = (page - 1) * pageSize;
     const groupEnd = Math.min(groupStart + pageSize, topLevelGroups.length);
 

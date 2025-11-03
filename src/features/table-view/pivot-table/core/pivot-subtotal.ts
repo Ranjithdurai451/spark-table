@@ -15,7 +15,6 @@ export function makeSubtotalRow(
     __subtotalLabel: `Total ${groupKey}`,
     ...parentValues,
     [rowGroups[level]]: `Total ${groupKey}`,
-    ParentKey: groupKey,
   };
 
   for (const colKey of valueCols) {
@@ -73,6 +72,7 @@ export function insertSubtotalRows(
       totalGroups: 0,
     };
   }
+  var hasSubtotals = false;
 
   const groupBy = (arr: any[], key: string) => {
     const map = new Map<string, any[]>();
@@ -106,6 +106,7 @@ export function insertSubtotalRows(
       result.push(...processed);
 
       if (processed.length > 1 && valueCols.length > 0) {
+        hasSubtotals = true;
         const subtotalRow = makeSubtotalRow(
           level,
           groupKey,
@@ -140,6 +141,7 @@ export function insertSubtotalRows(
   return {
     table,
     topLevelGroups,
+    hasSubtotals,
     totalGroups: topLevelGroups.length,
   };
 }

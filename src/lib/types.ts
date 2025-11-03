@@ -16,11 +16,13 @@ export interface RowSpanInfo {
 export interface AggregateDataResult {
   table: DataRow[];
   grandTotal: DataRow | null;
+  normalRowsLength: number;
   rowGroups: string[];
   colGroups: string[];
   valueCols: string[];
   topLevelGroups: GroupInfo[];
   totalGroups: number;
+  hasSubtotals: boolean;
   colAggInfo: Record<string, { field: string; agg: string }>;
 }
 export interface HeaderCell {
@@ -44,7 +46,7 @@ export type Agg = "sum" | "avg" | "count" | "min" | "max";
 export type Zone = "rows" | "columns" | "values" | "data";
 export interface AggregationValue {
   field: string;
-  agg: "sum" | "avg" | "count" | "min" | "max";
+  agg: Agg;
 }
 
 export interface LimitColumnsResult {
@@ -64,6 +66,8 @@ export interface PivotComputationResult {
   hasGrandTotal: boolean;
   hasOnlyRows: boolean;
   topLevelGroups: GroupInfo[];
+  hasSubtotals: boolean;
+  normalRowsLength: number;
   totalGroups: number;
 }
 
@@ -78,6 +82,7 @@ export type GroupInfo = {
 
 export type SubtotalResult = {
   table: any[];
+  hasSubtotals?: boolean;
   topLevelGroups: GroupInfo[];
   totalGroups: number;
 };

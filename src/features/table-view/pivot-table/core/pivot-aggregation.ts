@@ -14,6 +14,8 @@ export function aggregateData(
   const dataLen = data.length;
   if (dataLen === 0) {
     return {
+      hasSubtotals: false,
+      normalRowsLength: 0,
       totalGroups: 0,
       topLevelGroups: [],
       table: [],
@@ -128,6 +130,8 @@ export function aggregateData(
   return {
     table: subtotalResults.table,
     grandTotal: hasValues ? grandTotals : null,
+    hasSubtotals: subtotalResults.hasSubtotals || false,
+    normalRowsLength: table.length,
     rowGroups: rows,
     colGroups: cols,
     valueCols: colKeys,

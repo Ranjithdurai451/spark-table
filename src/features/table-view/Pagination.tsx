@@ -1,4 +1,6 @@
 import { useMemo } from "react";
+import { cn } from "@/lib/utils";
+import { Button } from "@/components/ui/button";
 
 type PaginationProps = {
   page: number;
@@ -7,6 +9,7 @@ type PaginationProps = {
   setPage: (page: number) => void;
   setPageSize?: (size: number) => void;
   isGroupBased?: boolean;
+  setIsGroupBased?: (val: boolean) => void;
   totalItems?: number;
 };
 
@@ -17,6 +20,7 @@ export function Pagination({
   setPage,
   setPageSize,
   isGroupBased = false,
+  setIsGroupBased,
   totalItems,
 }: PaginationProps) {
   if (!total) return null;
@@ -32,6 +36,7 @@ export function Pagination({
         ? `Showing ${start}-${end} of ${total} groups (${totalItems} total rows)`
         : `Showing ${start}-${end} of ${total} groups`;
     }
+
     return `Showing ${start}-${end} of ${total} rows`;
   }, [isGroupBased, page, pageSize, totalItems, total]);
 
@@ -51,29 +56,54 @@ export function Pagination({
 
   const sizeOptions = useMemo(() => {
     const baseSizes = isGroupBased ? [5, 10, 25, 50] : [10, 25, 50, 100];
-
     const filtered = baseSizes.filter((size) => size < total);
-
-    if (total <= 500) {
-      filtered.push(total);
-    }
-
+    if (total <= 500) filtered.push(total);
     return filtered.length > 0 ? filtered : [total];
   }, [total, isGroupBased]);
 
   return (
-    <div className="flex flex-col sm:flex-row items-center justify-between px-4 py-3 gap-3 bg-background border-t border-border text-xs">
+    <div className="flex flex-col sm:flex-row items-center justify-between gap-3 px-4 py-3 bg-card border-t border-border text-xs rounded-b-lg">
       <span className="text-muted-foreground font-medium">{label}</span>
 
-      <div className="flex items-center gap-3 flex-wrap justify-center">
-        {/* Page Size Dropdown - Show first on mobile */}
+      <div className="flex items-center gap-4 flex-wrap justify-center">
+        {setIsGroupBased && (
+          <div className="flex items-center gap-2 order-3 sm:order-1">
+            <div className="flex border border-border rounded-lg overflow-hidden">
+              <Button
+                type="button"
+                size="sm"
+                variant={isGroupBased ? "ghost" : "default"}
+                className={cn(
+                  "rounded-none text-xs font-medium",
+                  !isGroupBased && "bg-primary text-primary-foreground"
+                )}
+                onClick={() => setIsGroupBased(false)}
+              >
+                Rows
+              </Button>
+              <Button
+                type="button"
+                size="sm"
+                variant={isGroupBased ? "default" : "ghost"}
+                className={cn(
+                  "rounded-none text-xs font-medium",
+                  isGroupBased && "bg-primary text-primary-foreground"
+                )}
+                onClick={() => setIsGroupBased(true)}
+              >
+                Groups
+              </Button>
+            </div>
+          </div>
+        )}
+
         {setPageSize && (
           <span className="flex items-center gap-2 order-2 sm:order-1">
             <span className="text-muted-foreground">Show:</span>
             <select
               value={pageSize}
               onChange={handlePageSizeChange}
-              className="border border-border rounded px-2 py-1.5 bg-background text-xs font-medium min-w-[70px] cursor-pointer hover:bg-muted transition-colors"
+              className="border border-border rounded px-2 py-1.5 bg-background text-xs font-medium min-w-[70px] cursor-pointer hover:bg-muted transition-colors focus:outline-none focus:ring-2 focus:ring-ring"
             >
               {sizeOptions.map((size) => (
                 <option key={size} value={size}>
@@ -84,19 +114,16 @@ export function Pagination({
           </span>
         )}
 
-        {/* Navigation Controls */}
         <div className="flex items-center gap-2 order-1 sm:order-2">
-          {/* Prev Button */}
-          <button
-            className="px-3 py-1.5 rounded bg-muted text-foreground border border-border text-xs font-medium disabled:opacity-40 disabled:cursor-not-allowed hover:bg-muted/80 transition-colors"
+          <Button
+            variant="outline"
+            size="sm"
             disabled={page <= 1}
             onClick={() => setPage(page - 1)}
-            aria-label="Previous page"
           >
             Prev
-          </button>
+          </Button>
 
-          {/* Page Number Input */}
           <span className="flex items-center gap-1.5 text-muted-foreground">
             <span className="hidden sm:inline">Page</span>
             <input
@@ -105,22 +132,20 @@ export function Pagination({
               max={totalPages}
               value={page}
               onChange={handlePageInput}
-              className="w-12 border border-border rounded px-2 py-1 text-center bg-background text-xs font-medium focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent"
-              aria-label="Current page"
+              className="w-12 border border-border rounded px-2 py-1 text-center bg-background text-xs font-medium focus:outline-none focus:ring-2 focus:ring-ring focus:border-transparent"
             />
             <span>of</span>
             <span className="font-semibold text-foreground">{totalPages}</span>
           </span>
 
-          {/* Next Button */}
-          <button
-            className="px-3 py-1.5 rounded bg-muted text-foreground border border-border text-xs font-medium disabled:opacity-40 disabled:cursor-not-allowed hover:bg-muted/80 transition-colors"
+          <Button
+            variant="outline"
+            size="sm"
             disabled={page >= totalPages}
             onClick={() => setPage(page + 1)}
-            aria-label="Next page"
           >
             Next
-          </button>
+          </Button>
         </div>
       </div>
     </div>

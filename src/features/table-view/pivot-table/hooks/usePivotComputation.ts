@@ -94,6 +94,7 @@ export const usePivotComputation = () => {
           topLevelGroups: aggregated.topLevelGroups,
           totalGroups: aggregated.totalGroups,
           table: aggregated.table,
+          hasSubtotals: true,
           grandTotal: aggregated.grandTotal,
           rowGroups: aggregated.rowGroups,
           valueCols: aggregated.valueCols,
@@ -102,6 +103,7 @@ export const usePivotComputation = () => {
           colAggInfo: aggregated.colAggInfo,
           hasGrandTotal,
           hasOnlyRows,
+          normalRowsLength: aggregated.normalRowsLength,
         };
 
         setColumnLimitInfo(info);
